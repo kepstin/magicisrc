@@ -136,6 +136,19 @@ function gotoMbid(mbid) {
   var onLoad = function (event) {
     var e = document.getElementById("loading_status");
     e.innerHTML = tmpl("template_loading_success", event);
+    
+    /* Clean the release structure */
+    current_release.mbid = null;
+    
+    /* Set up the current release structure */
+    var doc = req.responseXML;
+    var release = doc.evaluate("/metadata/release", doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    current_release.mbid = release.attributes["id"];
+
+    var title = doc.evaluate("title", release, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    current_release.title = title.textContent;
+
+    console.log(current_release);
   };
   
   var onAbort = function(event) {
@@ -163,7 +176,7 @@ function gotoMbid(mbid) {
     req.addEventListener("abort", onAbort, false);
     req.addEventListener("error", onError, false);
 
-    req.open("GET", ws2_read_base + "release/" + mbid + "?inc=recordings", true);
+    req.open("GET", ws2_read_base + "release/" + mbid + "?inc=recordings+labels", true);
     req.send();
   };
 })();
