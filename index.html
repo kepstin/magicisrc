@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Kepstin’s Magic ISRC submitter</title>
+<script type="text/javascript">
+
+var ws2_read_base = "http://mbjs.kepstin.ca/ws/2/"
+
+function decodeParams(searchString) {
+  var vars = searchString.split('&');
+  var params = {};
+  for (var i = 0; i < vars.length; i++) {
+    var pair = vars[i].split('=');
+    if (pair[1]) {
+      params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+    } else {
+      params[decodeURIComponent(pair[0])] = '';
+    }
+  }
+  return params;
+}
+
+function encodeParams(hash) {
+  var pairs = [];
+  var keys = Object.keys(hash);
+  for (var i = 0; i < keys.length; i++) {
+    pairs.push(encodeURIComponent(keys[i]) +
+      (hash[keys[i]] ? '=' + encodeURIComponent(hash[keys[i]]) : ''));
+  }
+  if (pairs.length > 0) {
+    return '?' + pairs.join('&');
+  } else {
+    return '';
+  }
+}
+
+// Simple JavaScript Templating
+// John Resig - http://ejohn.org/ - MIT Licensed
+(function(){
+  var cache = {};
+ 
+  this.tmpl = function tmpl(str, data){
+    // Figure out if we're getting a template, or if we need to
+    // load the template - and be sure to cache the result.
+    var fn = !/\W/.test(str) ?
+      cache[str] = cache[str] ||
+        tmpl(document.getElementById(str).innerHTML) :
+     
+      // Generate a reusable function that will serve as a template
+      // generator (and which will be cached).
+      new Function("obj",
+        "var p=[],print=function(){p.push.apply(p,arguments);};" +
+       
+        // Introduce the data as local variables using with(){}
+        "with(obj){p.push('" +
+       
+        // Convert the template into pure JavaScript
+        str
+          .replace(/[\r\t\n]/g, " ")
+          .split("<%").join("\t")
+          .replace(/((^|%>)[^\t]*)'/g, "$1\r")
+          .replace(/\t=(.*?)%>/g, "',$1,'")
+          .split("\t").join("');")
+          .split("%>").join("p.push('")
+          .split("\r").join("\\'")
+      + "');}return p.join('');");
+   
+    // Provide some basic currying to the user
+    return data ? fn( data ) : fn;
+  };
+})();
+
+var entityMap = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': '&quot;',
+  "'": '&#39;',
+  "/": '&#x2F;'
+};
+
+function escapeHtml(string) {
+  return String(string).replace(/[&<>"'\/]/g, function (s) {
+    return entityMap[s];
+  });
+}
+
+var query = {};
+var errors = [];
+
+function onPopState(event) {
+  errors = [];
+  console.log("New location: " + window.location);
+  query = decodeParams(window.location.search.substring(1));
+  checkMbid(query['mbid']);
+}
+
+function checkMbid(mbid) {
+  var m = null;
+  if (mbid) {
+    m = mbid.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
+  }
+  if (m && m[1]) {
+    var mbid = m[1];
+    console.log("Got mbid: " + mbid);
+    loadRelease(mbid);
+  } else {
+    if (mbid) {
+      errors.push("Could not parse MBID from string \"" + mbid + "\"");
+    }
+    console.log("Didn't get an mbid");
+    document.body.innerHTML = tmpl("template_enter_mbid", {mbid: mbid ? mbid : ''});
+  }
+  window.onpopstate = onPopState;
+}
+
+function gotoMbid(mbid) {
+  errors = [];
+  query["mbid"] = mbid;
+  var location = window.location.href.split('?')[0] + encodeParams(query);
+  console.log("New location: " + location);
+  window.history.pushState(null, "", location); 
+  checkMbid(mbid);
+}
+
+(function () {
+  var current_release = {};
+  var saved_callback = null;
+  var req = null;
+  
+  var onProgress = function (event) {
+    e = document.getElementById("loading_status");
+    e.innerHTML = tmpl("template_loading_progress", event);
+  };
+  
+  var onLoad = function (event) {
+    document.getElementById("loading_status").innerHTML = "Done";
+  };
+  
+  var onAbort = function(event) {
+    e = document.getElementById("loading_status");
+    e.innerHTML = tmpl("template_loading_abort", event);
+  };
+  
+  var onError = function(event) {
+    e = document.getElementById("loading_status");
+    e.innerHTML = tmpl("template_loading_error", {status: req.status});
+  };
+  
+  this.loadRelease = function (mbid, callback) {
+    /* Nothing to do if we already have the required release loaded */
+    if (current_release["mbid"] === mbid) {
+      callback(current_release);
+    }
+    
+    document.body.innerHTML = tmpl("template_loading", {mbid: mbid, errors: errors});
+    
+    saved_callback = callback;
+    req = new XMLHttpRequest();
+    req.addEventListener("progress", onProgress, false);
+    req.addEventListener("load", onLoad, false);
+    req.addEventListener("abort", onAbort, false);
+    req.addEventListener("error", onError, false);
+
+    req.open("GET", ws2_read_base + "release/" + mbid, true);
+    req.send();
+  };
+})();
+
+
+</script>
+<script type="text/x-ejs" id="template_errors">
+<% if (errors.length > 0) { %>
+  <h2>Errors</h2>
+  <ul class="errors">
+  <% for (var i = 0; i < errors.length; i++) { %>
+    <li><%= escapeHtml(errors[i]) %></li>
+  <% } %>
+  </ul>
+<% } %>
+</script>
+<script type="text/x-ejs" id="template_loading">
+<h1>Loading release…</h1>
+<p>Loading release with mbid <%= mbid %></p>
+<p id="loading_status"></p>
+</script>
+<script type="text/x-ejs" id="template_loading_progress">
+<% if (lengthComputable) { %>
+  Loaded <%= loaded / total %>%
+<% } else { %>
+  Progress unknown
+<% } %>
+</script>
+<script type="text/x-ejs" id="template_loading_abort">
+Transfer aborted
+</script>
+<script type="text/x-ejs" id="template_loading_error">
+Transfer failed, status <%= status %>
+</script>
+<script type="text/x-ejs" id="template_enter_mbid">
+<h1>Enter a release mbid:</h1>
+<%= tmpl("template_errors", {errors: errors}) %>
+<form method="get" onsubmit="gotoMbid(document.getElementById(&quot;mbid&quot;).value); return false">
+  <input size="64" name="mbid" id="mbid" value="<%= escapeHtml(mbid) %>">
+  <input type="submit">
+</form>
+</script>
+  </head>
+  <body>
+<h1>Kepstin’s Magic ISRC submitter</h1>
+<p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
+<script type="text/javascript">
+query = decodeParams(window.location.search.substring(1));
+checkMbid(query['mbid']);
+</script>
+  </body>
+</html>
