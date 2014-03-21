@@ -95,6 +95,28 @@ function onPopState(event) {
   checkMbid(query['mbid']);
 }
 
+function displayRelease(release) {
+  var linearcount = 1;
+  for (i = 0; i < release.media.length; i++) {
+    var medium = release.media[i];
+    for (j = 0; j < medium.tracks.length; j++) {
+      var track = medium.tracks[j];
+      var varname = "isrc" + (i+1) + "-" + (j+1);
+      var oldvarname = "isrc" + linearcount;
+      
+      if (query[varname]) {
+        track["new_isrc"] = query[varname];
+      } else if (query[oldvarname]) {
+        track["new_isrc"] = query[oldvarname];
+      }
+      
+      linearcount++;
+    }
+  }
+
+  document.body.innerHTML = tmpl("template_release", release);
+}
+
 function checkMbid(mbid) {
   var m = null;
   if (mbid) {
@@ -103,7 +125,7 @@ function checkMbid(mbid) {
   if (m && m[1]) {
     var mbid = m[1];
     console.log("Got mbid: " + mbid);
-    loadRelease(mbid);
+    loadRelease(mbid, displayRelease);
   } else {
     if (mbid) {
       errors.push("Could not parse MBID from string \"" + mbid + "\"");
@@ -124,7 +146,7 @@ function gotoMbid(mbid) {
 }
 
 (function () {
-  var current_release = {};
+  var current_release = {id: null};
   var saved_callback = null;
   var req = null;
   
@@ -137,18 +159,10 @@ function gotoMbid(mbid) {
     var e = document.getElementById("loading_status");
     e.innerHTML = tmpl("template_loading_success", event);
     
-    /* Clean the release structure */
-    current_release.mbid = null;
-    
     /* Set up the current release structure */
-    var doc = req.responseXML;
-    var release = doc.evaluate("/metadata/release", doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-    current_release.mbid = release.attributes["id"];
-
-    var title = doc.evaluate("title", release, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-    current_release.title = title.textContent;
-
+    current_release = JSON.parse(req.responseText);
     console.log(current_release);
+    saved_callback(current_release);
   };
   
   var onAbort = function(event) {
@@ -163,7 +177,7 @@ function gotoMbid(mbid) {
   
   this.loadRelease = function (mbid, callback) {
     /* Nothing to do if we already have the required release loaded */
-    if (current_release["mbid"] === mbid) {
+    if (current_release.id === mbid) {
       callback(current_release);
     }
     
@@ -176,7 +190,7 @@ function gotoMbid(mbid) {
     req.addEventListener("abort", onAbort, false);
     req.addEventListener("error", onError, false);
 
-    req.open("GET", ws2_read_base + "release/" + mbid + "?inc=recordings+labels", true);
+    req.open("GET", ws2_read_base + "release/" + mbid + "?fmt=json&inc=recordings+labels", true);
     req.send();
   };
 })();
@@ -215,12 +229,30 @@ Transfer failed, status <%= status %>
 Transfer complete, processing…
 </script>
 <script type="text/x-ejs" id="template_enter_mbid">
-<h1>Enter a release mbid:</h1>
+<h1>Enter a release mbid</h1>
 <%= tmpl("template_errors", {errors: errors}) %>
 <form method="get" onsubmit="gotoMbid(document.getElementById(&quot;mbid&quot;).value); return false">
   <input size="64" name="mbid" id="mbid" value="<%= escapeHtml(mbid) %>">
   <input type="submit">
 </form>
+</script>
+<script type="text/x-ejs" id="template_release">
+<h1>Enter ISRCs for release <%= escapeHtml(title) %></h1>
+<% for (var i = 0; i < media.length; i++) { %>
+  <% var medium = media[i]; %>
+  <h2><%= medium.format ? escapeHtml(medium.format) : "Medium" %> <%= medium.position %><%= medium.title ? ":" + escapeHtml(medium.title) : "" %></h2>
+  <table>
+    <tr><th>#</th><th>Name</th><th>ISRC</th></tr>
+    <% for (var j = 0; j < medium.tracks.length; j++) { %>
+      <% var track = medium.tracks[j]; %>
+      <tr>
+        <td><%= escapeHtml(track.number) %></td>
+        <td><%= escapeHtml(track.title) %></td>
+        <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" name="isrc<%= i + 1 %>-<%= j + 1 %>" type="text" value="<%= track.new_isrc %>" size="32"></td>
+      </tr>
+    <% } %>
+  </table>
+<% } %>
 </script>
   </head>
   <body>
