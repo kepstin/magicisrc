@@ -129,21 +129,22 @@ function gotoMbid(mbid) {
   var req = null;
   
   var onProgress = function (event) {
-    e = document.getElementById("loading_status");
+    var e = document.getElementById("loading_status");
     e.innerHTML = tmpl("template_loading_progress", event);
   };
   
   var onLoad = function (event) {
-    document.getElementById("loading_status").innerHTML = "Done";
+    var e = document.getElementById("loading_status");
+    e.innerHTML = tmpl("template_loading_success", event);
   };
   
   var onAbort = function(event) {
-    e = document.getElementById("loading_status");
+    var e = document.getElementById("loading_status");
     e.innerHTML = tmpl("template_loading_abort", event);
   };
   
   var onError = function(event) {
-    e = document.getElementById("loading_status");
+    var e = document.getElementById("loading_status");
     e.innerHTML = tmpl("template_loading_error", {status: req.status});
   };
   
@@ -162,7 +163,7 @@ function gotoMbid(mbid) {
     req.addEventListener("abort", onAbort, false);
     req.addEventListener("error", onError, false);
 
-    req.open("GET", ws2_read_base + "release/" + mbid, true);
+    req.open("GET", ws2_read_base + "release/" + mbid + "?inc=recordings", true);
     req.send();
   };
 })();
@@ -196,6 +197,9 @@ Transfer aborted
 </script>
 <script type="text/x-ejs" id="template_loading_error">
 Transfer failed, status <%= status %>
+</script>
+<script type="text/x-ejs" id="template_loading_success">
+Transfer complete, processing…
 </script>
 <script type="text/x-ejs" id="template_enter_mbid">
 <h1>Enter a release mbid:</h1>
