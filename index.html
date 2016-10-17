@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <title>Kepstin’s Magic ISRC submitter</title>
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
 <script type="text/javascript">
 
-var ws2_read_base = "http://mbjs.kepstin.ca/ws/2/"
+var ws2_read_base = "https://musicbrainz.org/ws/2/";
 
 function decodeParams(searchString) {
   var vars = searchString.split('&');
@@ -14,7 +16,7 @@ function decodeParams(searchString) {
     if (pair[1]) {
       params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
     } else {
-      params[decodeURIComponent(pair[0])] = '';
+      params[decodeURIComponent(pair[0])] = undefined;
     }
   }
   return params;
@@ -79,6 +81,7 @@ var entityMap = {
   "/": '&#x2F;'
 };
 
+
 function escapeHtml(string) {
   return String(string).replace(/[&<>"'\/]/g, function (s) {
     return entityMap[s];
@@ -113,8 +116,102 @@ function displayRelease(release) {
       linearcount++;
     }
   }
+  if (query.submit) {
+    displaySubmitRelease(release);
+  } else {
+    document.getElementById("container").innerHTML = tmpl("template_release", release);
+  }
+}
 
-  document.body.innerHTML = tmpl("template_release", release);
+var ccodesUpdated = '2015-01';
+var ccodes = [
+  'AL', 'DZ', 'AD', 'AO', 'AI', 'AG', 'AR', 'AM', 'AW', 'AU', 'AT', 'AZ',
+  'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BM', 'BO', 'BA', 'BR', 'BX',
+  'BG', 'BF',
+  'CM', 'CA', 'KY', 'CL', 'CN', 'TW', 'CO', 'CD', 'CI', 'HR', 'CU', 'CW',
+  'CY', 'CZ',
+  'DK', 'DM', 'DO',
+  'EC', 'EG', 'SV', 'EE', 'ET',
+  'FJ', 'FI', 'FR', 'FX', 'PF',
+  'GM', 'GE', 'DE', 'GH', 'GI', 'GR', 'GD', 'GT', 'GG', 'GY',
+  'HT', 'HN', 'HK', 'HU',
+  'IS', 'IN', 'ID', 'IR', 'IQ', 'IE', 'IL', 'IT',
+  'JP', 'JE', 'JO',
+  'KZ', 'KE', 'KR',
+  'LA', 'LV', 'LB', 'LS', 'LI', 'LT', 'LU',
+  'MO', 'MK', 'MW', 'MY', 'MV', 'MT', 'MU', 'MX', 'MD', 'MC', 'ME', 'MS',
+  'MA', 'MZ',
+  'NA', 'NP', 'NL', 'NZ', 'NG', 'MP', 'NO',
+  'PK', 'PA', 'PG', 'PY', 'PE', 'PH', 'PL', 'PT', 'PR',
+  'QA',
+  'RO', 'RU',
+  'KN', 'LC', 'VC', 'SM', 'SA', 'SN', 'RS', 'SC', 'SL', 'SG', 'SX', 'SK',
+  'SI', 'SB', 'ZA', 'ES', 'LK', 'SZ', 'SE', 'CH',
+  'TZ', 'TH', 'TO', 'TT', 'TN', 'TR',
+  'UG', 'UA', 'AE', 'GB', 'UK', 'US', 'QM', 'QZ', 'UY', 'UZ',
+  'VU', 'VE', 'VN', 'VG',
+  'ZM', 'ZW',
+  'TC', /* TuneCore */
+  'DG', /* International use, includes Turks and Caicos Islands */
+  'ZZ', /* International use, individual allocations */
+  'CS', 'YU' /* Historical */
+];
+
+function displaySubmitRelease(release) {
+  // Do ISRC validation
+  var seenISRCs = {};
+  for (i = 0; i < release.media.length; i++) {
+    var medium = release.media[i];
+    for (j = 0; j < medium.tracks.length; j++) {
+      var track = medium.tracks[j];
+      if (!track.new_isrc) {
+        track.new_isrc = null;
+        continue;
+      }
+      // Trim whitespace from ISRCs
+      track.new_isrc = track.new_isrc.trim();
+      // Remove punctuation and internal whitespace
+      track.new_isrc = track.new_isrc.replace(/[\s\.+-]/g, '');
+      // Ignore blank ISRCs
+      if (track.new_isrc == '') {
+        track.new_isrc = null;
+        continue;
+      }
+      // Uppercaseify
+      track.new_isrc = track.new_isrc.toUpperCase();
+      
+      error_prefix = "Medium " + medium.position + " Track " + track.number + ": ";
+      // Parse the ISRC
+      match = track.new_isrc.match(/^([A-Z]{2})([A-Z0-9]{3})([0-9]{2})([0-9]{5})$/);
+      if (! match) {
+        errors.push("Error: " + error_prefix + "ISRC " + track.new_isrc + " is malformed");
+        track.new_isrc = null;
+        continue;
+      }
+      if (match[2] == '000') {
+        errors.push("Warhing: " + error_prefix + " Registrant code '" + match[2] + "' indicates blank or dummy data");
+      }
+      if ((match[1] == 'US' && match[2] == 'S1Z') ||
+          (match[1] == 'JM' && match[2] == 'K40') ||
+          (match[1] == 'NZ' && match[2] == 'AA0')) {
+        errors.push("Warning: " + error_prefix + " Country code '" + match[1] + "' registration code '" + match[2] + "' is reserved for documentation");
+      }
+      if (ccodes.indexOf(match[1]) === -1) {
+        errors.push("Warning: " + error_prefix + " Country code '" + match[1] + "' is not allocated by the IFPI (last updated " + ccodesUpdated + ")");
+      }
+
+      // Check for duplicate ISRCs
+      if (seenISRCs[track.new_isrc]) {
+        errors.push("Warning: " + error_prefix + " has duplicate ISRC " + track.new_isrc);
+      }
+      seenISRCs[track.new_isrc] = true;
+      // Print a message if an ISRC is already present
+      if (track.recording.isrcs.indexOf(track.new_isrc) != -1) {
+        errors.push("Info: " + error_prefix + "already has ISRC " + track.new_isrc);
+      }
+    }
+  }
+  document.getElementById("container").innerHTML = tmpl("template_submit", release);
 }
 
 function checkMbid(mbid) {
@@ -131,7 +228,7 @@ function checkMbid(mbid) {
       errors.push("Could not parse MBID from string \"" + mbid + "\"");
     }
     console.log("Didn't get an mbid");
-    document.body.innerHTML = tmpl("template_enter_mbid", {mbid: mbid ? mbid : ''});
+    document.getElementById("container").innerHTML = tmpl("template_enter_mbid", {mbid: mbid ? mbid : ''});
   }
   window.onpopstate = onPopState;
 }
@@ -143,6 +240,32 @@ function gotoMbid(mbid) {
   console.log("New location: " + location);
   window.history.pushState(null, "", location); 
   checkMbid(mbid);
+}
+
+function gotoSubmit() {
+  errors = [];
+  // Save all the MBIDs
+  for (i = 0; i < release.media.length; i++) {
+    var medium = release.media[i];
+    for (j = 0; j < medium.tracks.length; j++) {
+      var varname = "isrc" + (i+1) + "-" + (j+1);
+      var e = document.getElementById(varname);
+      query[varname] = e.value;
+    }
+  }
+  var location = window.location.href.split('?')[0] + encodeParams(query);
+  console.log("New location: " + location);
+  window.history.pushState(null, "", location);
+  checkMbid(mbid);
+}
+
+function gotoBack() {
+  errors = [];
+  query["submit"] = undefined;
+  var location = window.location.href.split('?')[0] + encodeParams(query);
+  console.log("New location: " + location);
+  window.history.pushState(null, "", location); 
+  checkMbid(query['mbid']);
 }
 
 (function () {
@@ -181,7 +304,7 @@ function gotoMbid(mbid) {
       callback(current_release);
     }
     
-    document.body.innerHTML = tmpl("template_loading", {mbid: mbid, errors: errors});
+    document.getElementById("container").innerHTML = tmpl("template_loading", {mbid: mbid, errors: errors});
     
     saved_callback = callback;
     req = new XMLHttpRequest();
@@ -190,7 +313,7 @@ function gotoMbid(mbid) {
     req.addEventListener("abort", onAbort, false);
     req.addEventListener("error", onError, false);
 
-    req.open("GET", ws2_read_base + "release/" + mbid + "?fmt=json&inc=recordings+labels", true);
+    req.open("GET", ws2_read_base + "release/" + mbid + "?fmt=json&inc=recordings+labels+isrcs", true);
     req.send();
   };
 })();
@@ -238,26 +361,66 @@ Transfer complete, processing…
 </script>
 <script type="text/x-ejs" id="template_release">
 <h1>Enter ISRCs for release <%= escapeHtml(title) %></h1>
-<% for (var i = 0; i < media.length; i++) { %>
-  <% var medium = media[i]; %>
-  <h2><%= medium.format ? escapeHtml(medium.format) : "Medium" %> <%= medium.position %><%= medium.title ? ":" + escapeHtml(medium.title) : "" %></h2>
-  <table>
-    <tr><th>#</th><th>Name</th><th>ISRC</th></tr>
-    <% for (var j = 0; j < medium.tracks.length; j++) { %>
-      <% var track = medium.tracks[j]; %>
+<%= tmpl("template_errors", {errors: errors}) %>
+<form method="get" onsubmit="gotoSubmit(); return false">
+  <% for (var i = 0; i < media.length; i++) { %>
+    <% var medium = media[i]; %>
+    <h2><%= medium.format ? escapeHtml(medium.format) : "Medium" %> <%= medium.position %><%= medium.title ? ": " + escapeHtml(medium.title) : "" %></h2>
+    <table class="table">
       <tr>
-        <td><%= escapeHtml(track.number) %></td>
-        <td><%= escapeHtml(track.title) %></td>
-        <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" name="isrc<%= i + 1 %>-<%= j + 1 %>" type="text" value="<%= track.new_isrc %>" size="32"></td>
+        <th style="width: 5%">#</th>
+        <th style="width: 45%">Name</th>
+        <th style="width: 30%">ISRC</th>
+        <th style="width: 20%">Existing ISRCs</th>
       </tr>
+      <% for (var j = 0; j < medium.tracks.length; j++) { %>
+        <% var track = medium.tracks[j]; %>
+        <tr>
+          <td><%= escapeHtml(track.number) %></td>
+          <td><%= escapeHtml(track.title) %></td>
+          <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control" name="isrc<%= i + 1 %>-<%= j + 1 %>" type="text" value="<%= track.new_isrc %>" size="32"></td>
+          <td>
+            <% for (k = 0; k < track.recording.isrcs.length; k++) { %>
+              <%= escapeHtml(track.recording.isrcs[k]) %>
+            <% } %>
+          </td>
+        </tr>
+      <% } %>
+    </table>
+  <% } %>
+  <input type="hidden" name="mbid" id="mbid" value="<%= escapeHtml(id) %>">
+  <input type="submit" class="btn btn-primary" value="Submit" name="submit">
+</form>
+</script>
+<script type="text/x-ejs" id="template_submit">
+<h1>Submit to MusicBrainz</h1>
+<%= tmpl("template_errors", {errors: errors}) %>
+<h2>Edit Preview</h2>
+<form action="https://musicbrainz.org/ws/1/track/" method="post">
+  <ul>
+    <% for (var i = 0; i < media.length; i++) { %>
+      <% var medium = media[i]; %>
+      <% for (var j = 0; j < medium.tracks.length; j++) { %>
+        <% var track = medium.tracks[j]; %>
+        <% if (track.new_isrc) { %>
+          <li>
+            ISRC <%= escapeHtml(track.new_isrc) %> to <%= medium.format ? escapeHtml(medium.format) : "Medium" %> <%= medium.position %> Track <%= escapeHtml(track.number) %> <a href="https://musicbrainz.org/recording/<%= track.id %>"><%= escapeHtml(track.title) %></a>
+            <input type="hidden" name="isrc" value="<%= escapeHtml(track.recording.id) %> <%= escapeHtml(track.new_isrc) %>">
+          </li>
+        <% } %>
+      <% } %>
     <% } %>
-  </table>
-<% } %>
+  </ul>
+  <input type="submit" value="Submit to MusicBrainz">
+</form>
+<button onclick="gotoBack(); return false">Back to edit form</button>
 </script>
   </head>
   <body>
+<div class="container" id="container">
 <h1>Kepstin’s Magic ISRC submitter</h1>
 <p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
+</div>
 <script type="text/javascript">
 query = decodeParams(window.location.search.substring(1));
 checkMbid(query['mbid']);
