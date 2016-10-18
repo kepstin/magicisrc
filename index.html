@@ -255,7 +255,6 @@ function checkInputIsrc(event) {
           }
           if (startingInputIndex !== null) {
             isrcInputs[input].value = isrcList[isrc];
-            sendEvent(isrcInputs[input], "change");
             if (isrcInputs[input].getAttribute("oldValue") !== isrcInputs[input].value) {
               isrcInputs[input].style.setProperty("background-color", "#ff6");
               isrcInputs[input].setAttribute("oldValue", isrcInputs[input].value)
@@ -266,12 +265,6 @@ function checkInputIsrc(event) {
       }
     }
   }
-}
-
-function sendEvent(node, eventName) {
-  event = document.createEvent("HTMLEvents");
-  event.initEvent(eventName, true, true);
-  node.dispatchEvent(event);
 }
 
 function gotoSubmit() {
