@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Kepstin’s Magic ISRC submitter</title>
+    <title>Kepstin’s Magic ISRC submitter (version 2016.10.18.1315)</title>
 <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
 <script type="text/javascript">
 
@@ -242,6 +242,38 @@ function gotoMbid(mbid) {
   checkMbid(mbid);
 }
 
+function checkInputIsrc(event) {
+  if (event && event.target && event.target.classList.contains("form-control") && event.target.getAttribute("id").match(/^isrc\d+-\d+$/)) {
+    var isrcList = event.target.value.toUpperCase().match(/[A-Z]{2}\-?[A-Z0-9]{3}\-?[0-9]{2}\-?[0-9]{5}/g);
+    if (isrcList) {
+      var isrcInputs = event.currentTarget.querySelectorAll("form > table > tbody > tr > td > input.form-control[id^='isrc']");
+      for (var isrc = 0, input = 0, startingInputIndex = null; input < isrcInputs.length; input += 1) {
+        isrcInputs[input].style.removeProperty("background-color");
+        if (isrc < isrcList.length) {
+          if (isrcInputs[input] === event.target) {
+            startingInputIndex = input;
+          }
+          if (startingInputIndex !== null) {
+            isrcInputs[input].value = isrcList[isrc];
+            sendEvent(isrcInputs[input], "change");
+            if (isrcInputs[input].getAttribute("oldValue") !== isrcInputs[input].value) {
+              isrcInputs[input].style.setProperty("background-color", "#ff6");
+              isrcInputs[input].setAttribute("oldValue", isrcInputs[input].value)
+            }
+            isrc += 1;
+          }
+        }
+      }
+    }
+  }
+}
+
+function sendEvent(node, eventName) {
+  event = document.createEvent("HTMLEvents");
+  event.initEvent(eventName, true, true);
+  node.dispatchEvent(event);
+}
+
 function gotoSubmit() {
   errors = [];
   // Save all the MBIDs
@@ -362,7 +394,7 @@ Transfer complete, processing…
 <script type="text/x-ejs" id="template_release">
 <h1>Enter ISRCs for release <%= escapeHtml(title) %></h1>
 <%= tmpl("template_errors", {errors: errors}) %>
-<form method="get" onsubmit="gotoSubmit(); return false">
+<form method="get" onsubmit="gotoSubmit(); return false" oninput="checkInputIsrc(event)">
   <% for (var i = 0; i < media.length; i++) { %>
     <% var medium = media[i]; %>
     <h2><%= medium.format ? escapeHtml(medium.format) : "Medium" %> <%= medium.position %><%= medium.title ? ": " + escapeHtml(medium.title) : "" %></h2>
@@ -378,7 +410,7 @@ Transfer complete, processing…
         <tr>
           <td><%= escapeHtml(track.number) %></td>
           <td><%= escapeHtml(track.title) %></td>
-          <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control" name="isrc<%= i + 1 %>-<%= j + 1 %>" type="text" value="<%= track.new_isrc %>" size="32"></td>
+          <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control" name="isrc<%= i + 1 %>-<%= j + 1 %>" type="text" value="<%= track.new_isrc %>" oldValue="<%= track.new_isrc %>" size="32"></td>
           <td>
             <% for (k = 0; k < track.recording.isrcs.length; k++) { %>
               <%= escapeHtml(track.recording.isrcs[k]) %>
