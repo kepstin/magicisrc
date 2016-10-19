@@ -244,8 +244,9 @@ function gotoMbid(mbid) {
 
 function checkInputIsrc(event) {
   if (event && event.target && event.target.classList.contains("form-control") && event.target.getAttribute("id").match(/^isrc\d+-\d+$/)) {
-    var isrcList = event.target.value.toUpperCase().match(/[A-Z]{2}\-?[A-Z0-9]{3}\-?[0-9]{2}\-?[0-9]{5}/g);
+    var isrcList = event.target.value.toUpperCase().match(/\b[A-Z]{2}\-?[A-Z0-9]{3}\-?[0-9]{2}\-?[0-9]{5}\b/g);
     if (isrcList) {
+      // If a text containing several ISRCs is detected, set all consecutive fields
       var isrcInputs = event.currentTarget.querySelectorAll("form > table > tbody > tr > td > input.form-control[id^='isrc']");
       for (var isrc = 0, input = 0, startingInputIndex = null; input < isrcInputs.length; input += 1) {
         isrcInputs[input].style.removeProperty("background-color");
@@ -258,6 +259,7 @@ function checkInputIsrc(event) {
             if (isrcInputs[input].getAttribute("oldValue") !== isrcInputs[input].value) {
               isrcInputs[input].style.setProperty("background-color", "#ff6");
               isrcInputs[input].setAttribute("oldValue", isrcInputs[input].value)
+              isrcInputs[input].focus();
             }
             isrc += 1;
           }
