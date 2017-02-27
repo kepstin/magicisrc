@@ -120,6 +120,7 @@ function displayRelease(release) {
     displaySubmitRelease(release);
   } else {
     document.getElementById("container").innerHTML = tmpl("template_release", release);
+    document.querySelector("input[id^='isrc']").focus();
   }
 }
 
@@ -382,7 +383,7 @@ Transfer complete, processing…
 <h1>Enter a release mbid</h1>
 <%= tmpl("template_errors", {errors: errors}) %>
 <form method="get" onsubmit="gotoMbid(document.getElementById(&quot;mbid&quot;).value); return false">
-  <input size="64" name="mbid" id="mbid" value="<%= escapeHtml(mbid) %>">
+  <input size="64" name="mbid" id="mbid" value="<%= escapeHtml(mbid) %>" autofocus>
   <input type="submit">
 </form>
 </script>
