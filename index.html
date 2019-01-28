@@ -5,11 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>kepstin’s MagicISRC</title>
     <link rel="stylesheet" href="bootstrap.min.css">
-<style>
-#container {
-  margin-top: 1rem;
-}
-</style>
 <script type="text/javascript">
 
 // Configuration
@@ -28,7 +23,9 @@ var login = {};
 // ID of the release to operate on
 var mbid = null;
 // Set to false if MBID parsing fails
-var mbid_valid = true;
+var mbidValid = true;
+// A cached copy of the current release info fetched from MusicBrainz
+var currentRelease = {};
 
 // Simple JavaScript Templating
 // John Resig - http://ejohn.org/ - MIT Licensed
@@ -99,17 +96,22 @@ function generateStateId() {
 var query = {};
 var errors = [];
 
-// Perform a navigation to a new state, represented by a set of URL search
-// parameters. This pushes the new URL as a new history item, and then
-// loads the page as if it was just navigated to.
-function pushState(params) {
+// Return the full URL for the location indicated by params
+function updateLocation(params) {
   var location = new URL(window.location.href);
   if (params == "") {
     location.search = "";
   } else {
     location.search = "?" + params;
   }
-  window.history.pushState(null, "", location);
+  return location;
+}
+
+// Perform a navigation to a new state, represented by a set of URL search
+// parameters. This pushes the new URL as a new history item, and then
+// loads the page as if it was just navigated to.
+function pushState(params) {
+  window.history.pushState(null, "", updateLocation(params));
   onPopState();
 }
 
@@ -122,9 +124,12 @@ function onPopState(event) {
 
 function loadState(params) {
   checkLogin();
+  checkMbid(params);
   if (params.has("state") && (params.has("code") || params.has("error"))) {
     // This is the OAuth callback
     handleLoginCallback(params);
+  } else if (mbid && mbidValid) {
+    handleRelease(params);
   } else {
     // Fallback: render index page
     renderIndex(params);
@@ -147,6 +152,25 @@ function checkLogin() {
   renderNavbar();
 }
 
+function checkMbid(params) {
+  let newMbid = params.get("mbid");
+  if (!newMbid || newMbid == "") {
+    mbid = null;
+    mbidValid = true;
+    return;
+  }
+
+  m = newMbid.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
+  if (m && m[1]) {
+    mbid = m[1];
+    mbidValid = true;
+    console.log("Got mbid: " + mbid);
+  } else {
+    mbid = newMbid;
+    mbidValid = false;
+  }
+}
+
 function doLogin() {
   var stateId = generateStateId();
   var state = {
@@ -163,16 +187,13 @@ function doLogin() {
   params.set("client_id", mb_oauth_client_id);
   params.set("redirect_uri", mb_oauth_redirect_uri);
   params.set("scope", "profile submit_isrc");
+  params.set("approval_prompt", "force");
   params.set("state", stateId);
 
   window.location = url;
 }
 
 function handleLoginCallback(params) {
-  var location = new URL(window.location.href);
-  location.search = "";
-  window.history.replaceState(null, "", location);
-
   renderLoginProgress();
 
   var stateId = params.get('state');
@@ -183,12 +204,24 @@ function handleLoginCallback(params) {
 
   var code = params.get('code');
   if (!code) {
-    return renderError("OAuth2 callback did not return a code. Error: " + query['error']);
+    return renderError("OAuth2 callback did not return a code. Error: " + params.get("error_description"));
   }
 
   console.log("restored state:", state);
 
-  // Fetch the auth token
+  // Fetch the auth token and userinfo
+  fetchAccessToken(code)
+    .catch(error => { renderError("When fetching OAuth2 token: " + error) })
+    .then(fetchUserinfo)
+    .catch(error => { renderError("When fetching OAuth2 userinfo: " + error) })
+    .then(() => {
+      // We want to do a full navigation here, so that a reload won't try
+      // to fetch the access token again
+      window.location = updateLocation(new URLSearchParams(state["params"]));
+    });
+}
+
+function fetchAccessToken(code) {
   var url = new URL("token", mb_oauth_base);
   var data = new URLSearchParams();
   data.set("grant_type", "authorization_code");
@@ -196,31 +229,75 @@ function handleLoginCallback(params) {
   data.set("client_id", mb_oauth_client_id);
   data.set("client_secret", mb_oauth_client_secret);
   data.set("redirect_uri", mb_oauth_redirect_uri);
-  window.fetch(url.href, { method: "POST", body: data })
-    .then(response => { return response.json(); })
+  return window.fetch(url, { method: "POST", body: data })
+    .then(resolveOauthResponse)
     .then(response => {
       login = {
         accessToken: response["access_token"],
         expires: new Date().getTime() + (response["expires_in"] * 1000)
       };
       window.localStorage.setItem("mb_login", JSON.stringify(login));
-    })
-    .catch(error => { renderError("When fetching OAuth2 token: " + error) })
-    .then(doGetUserInfo)
-    .then(() => {
-      pushState(new URLSearchParams(state["params"]));
     });
 }
 
-function doGetUserInfo() {
+function fetchUserinfo() {
   var url = new URL("userinfo", mb_oauth_base);
-  return window.fetch(url.href, { headers: { "Authorization": "Bearer " + login["accessToken"] } })
-    .then(response => { return response.json(); })
+  return window.fetch(url, { headers: { "Authorization": "Bearer " + login["accessToken"] } })
+    .then(resolveOauthResponse)
     .then(response => {
       login["userInfo"] = response;
       window.localStorage.setItem("mb_login", JSON.stringify(login));
-    })
-    .catch(error => { renderError("When fetching OAuth2 userinfo: " + error) });
+    });
+}
+
+function handleRelease() {
+  fetchRelease(mbid)
+    .then(release => {
+      renderRelease(release);
+    }, error => {
+      renderError("When fetching MusicBrainz release: " + error)
+    });
+}
+
+function fetchRelease(mbid) {
+  // Check if the loaded release is the right one; if so, just use it.
+  if (currentRelease.id == mbid) {
+    return Promise.resolve(currentRelease);
+  }
+
+  // Load data for the requested release
+  var url = new URL("release/" + mbid, mb_ws2_base);
+  var params = url.searchParams;
+  params.set("fmt", "json");
+  params.set("inc", "artist-credits+isrcs+labels+recordings");
+  return window.fetch(url)
+    .then(resolveWs2ResponseJson)
+    .then(response => {
+      console.log(response);
+      currentRelease = response;
+      return response;
+    });
+}
+
+function resolveOauthResponse(response) {
+  if (response.ok) {
+    return Promise.resolve(response.json());
+  }
+
+  return response.text()
+    .then(text => {
+      return Promise.reject(new Error(text));
+    });
+}
+
+function resolveWs2ResponseJson(response) {
+  return response.json()
+    .then(body => {
+      if (body["error"]) {
+        return Promise.reject(new Error(body["error"]));
+      }
+      return Promise.resolve(body);
+    });
 }
 
 function doLogout() {
@@ -244,7 +321,12 @@ function renderIndex(params) {
 
 function renderNavbar() {
   var navbar = document.getElementById("navbar");
-  navbar.innerHTML = tmpl("template_navbar", {login: login});
+  var rootLocation = new URL(window.location);
+  rootLocation.search = "";
+  navbar.innerHTML = tmpl("template_navbar", {
+    login: login,
+    rootLocation: rootLocation
+  });
 }
 
 function renderLoginProgress() {
@@ -255,15 +337,24 @@ function renderError(error) {
   document.getElementById("container").innerHTML = tmpl("template_error", {error: error});
 }
 
+function renderRelease(release) {
+  console.log("rendering the release!");
+  var container = document.getElementById("container");
+  container.innerHTML = tmpl("template_release", {
+    release: release
+  });
+}
+
 </script>
 <script type="text/x-ejs" id="template_index">
+<p>MagicISRC is a tool that makes it easy to submit ISRCs for every track on a <a href="https://musicbrainz.org/">MusicBrainz</a> release.</p>
 <form method="get" onsubmit="doSubmitMbid(); return false;">
   <div class="form-group">
     <label for="mbid">Enter a release MBID:</label>
     <div class="form-row">
       <div class="col">
-        <input type="text" class="form-control form-control-lg<% if (!mbid_valid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
-        <div class="invalid-feedback">The provided value doesn’t appear to contain a release MBID</div>
+        <input type="text" class="form-control form-control-lg<% if (!mbidValid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
+        <div class="invalid-feedback">The provided value doesn’t contain an MBID</div>
       </div>
       <div class="col-auto">
         <button type="submit" class="btn btn-lg btn-primary">Load</button>
@@ -276,7 +367,7 @@ function renderError(error) {
 </form>
 </script>
 <script type="text/x-ejs" id="template_navbar">
-<span class="navbar-brand mr-auto">MagicISRC</span>
+<a class="navbar-brand mr-auto" href="<%= escapeHtml(rootLocation) %>">kepstin’s MagicISRC</a>
 <% if (login.userInfo) { %>
   <span class="navbar-text" style="margin-right: 1em"><%= escapeHtml(login.userInfo.sub) %></span>
   <form class="form-inline">
@@ -288,22 +379,63 @@ function renderError(error) {
   </form>
 <% } %>
 </script>
+<script type="text/x-ejs" id="template_release">
+<h1 class="h3">
+  <%= escapeHtml(release["title"]) %><br>
+  <small class="text-muted"><%= tmpl("template_ac", {ac: release["artist-credit"]}) %></small>
+</h1>
+<% for (var i = 0; i < release["media"].length; i++) { %>
+  <% var medium = release["media"][i]; %>
+  <h2 class="h5">
+    <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><%= medium["title"] ? ": " + escapeHtml(medium["title"]) : "" %>
+  </h2>
+  <table class="table">
+    <thead>
+      <th scope="col" class="col-1">#</th>
+      <th scope="col" class="col-5">Track</th>
+      <th scope="col" class="col-3">Existing ISRCs</th>
+      <th scope="col" class="col-3">New ISRC</th>
+    </thead>
+    <tbody>
+      <% for (var j = 0; j < medium["tracks"].length; j++) { %>
+        <% var track = medium["tracks"][j]; %>
+        <tr>
+          <th scope="row"><%= escapeHtml(track["number"]) %></th>
+          <td>
+            <%= escapeHtml(track["title"]) %><br>
+            <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
+          </td>
+          <td>
+            <ul class="list-unstyled">
+              <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
+                <li><%= escapeHtml(track["recording"]["isrcs"][k]) %></li>
+              <% } %>
+            </ul>
+          </td>
+          <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control" type="text"></td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+<% } %>
+</script>
 <script type="text/x-ejs" id="template_login_progress">
 <h2>Logging you in…</h2>
 </script>
+<script type="text/x-ejs" id="template_ac"><% for (var i = 0; i < ac.length; i++) { %><%= escapeHtml(ac[i]["name"]) %><%= escapeHtml(ac[i]["joinphrase"]) %><% } %></script>
 <script type="text/x-ejs" id="template_error">
 <h2>A bad thing happened</h2>
-<pre><%= escapeHtml("" + error) %></pre>
+<p><%= escapeHtml("" + error) %></p>
 </script>
   </head>
   <body>
-<nav class="navbar navbar-light bg-light">
+<nav class="navbar navbar-light bg-light mb-3">
   <div class="container" id="navbar">
     <span class="navbar-brand mr-auto">MagicISRC</span>
   </div>
 </nav>
 <div class="container" id="container">
-<h1>kepstin’s MagicISRC Beta</h1>
+<h1>kepstin’s MagicISRC</h1>
 <p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
 </div>
 <script type="text/javascript">
