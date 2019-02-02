@@ -4,8 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>kepstin’s MagicISRC</title>
-    <link rel="stylesheet" href="bootstrap.min.css">
+    <link rel="stylesheet" href="bootstrap.css">
 <script type="text/javascript">
+"use strict";
+
+// Disable automatic scroll restoration where possible, the app handles it.
+if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
 
 // Configuration
 
@@ -22,17 +26,32 @@ var mb_oauth_client_secret = "_1KuzAcMHqb-5VRdRsa61Q"; // Not so secret after al
 var login = {};
 // ID of the release to operate on
 var mbid = null;
-// Set to false if MBID parsing fails
-var mbidValid = true;
+// Set to true if MBID parsing fails
+var mbidInvalid = false;
 // A cached copy of the current release info fetched from MusicBrainz
 var currentRelease = {};
+// The list of ISRCs to be added. Structure is as follows:
+// Array of media, each containing:
+//   Array of tracks, each containing:
+//     Object, with properties:
+//       isrc: The ISRC string
+//       invalid: Boolean, true if ISRC cannot be submitted
+//       checks: Array of check results, each containing:
+//         Object, with properties:
+//           type: One of "danger", "warning", "info"
+//           message: A human-readable check message
+var isrcs = null;
+// True if any ISRCs are valid, and the edit preview should be shown
+var anyISRCsValid = false;
+// State from the most recently popped history
+var poppedState = null;
 
 // Simple JavaScript Templating
 // John Resig - http://ejohn.org/ - MIT Licensed
-(function(){
+(function(self){
   var cache = {};
  
-  this.tmpl = function tmpl(str, data){
+  self.tmpl = function tmpl(str, data){
     // Figure out if we're getting a template, or if we need to
     // load the template - and be sure to cache the result.
     var fn = !/\W/.test(str) ?
@@ -61,24 +80,17 @@ var currentRelease = {};
     // Provide some basic currying to the user
     return data ? fn( data ) : fn;
   };
-})();
+})(window);
 
-(function() {
-  var entityMap = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': '&quot;',
-    "'": '&#39;',
-    "/": '&#x2F;'
-  };
+(function(self) {
+  var entityMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;', "/": '&#x2F;' };
 
-  this.escapeHtml = function escapeHtml(string) {
+  self.escapeHtml = function escapeHtml(string) {
     return String(string).replace(/[&<>"'\/]/g, function (s) {
       return entityMap[s];
     });
   };
-})();
+})(window);
 
 function bufferToHex(buffer) {
   return Array
@@ -111,14 +123,28 @@ function updateLocation(params) {
 // parameters. This pushes the new URL as a new history item, and then
 // loads the page as if it was just navigated to.
 function pushState(params) {
-  window.history.pushState(null, "", updateLocation(params));
+  window.history.replaceState({scrollX: window.scrollX, scrollY: window.scrollY}, "", window.location.href);
+  window.history.pushState({scrollX: 0, scrollY: 0}, "", updateLocation(params));
   onPopState();
+}
+
+// Update the URL for an existing state.
+// This is used to save parameter cleanup values, primarily. Unlike pushState
+// it does not trigger a page load
+function replaceState(params) {
+  window.history.replaceState(null, "", updateLocation(params));
 }
 
 function onPopState(event) {
   errors = [];
   console.log("New location: " + window.location);
-  params = new URLSearchParams(window.location.search);
+  if (event) {
+    poppedState = event.state;
+  } else {
+    poppedState = window.history.state;
+  }
+  console.log("poppedState", poppedState);
+  let params = new URLSearchParams(window.location.search);
   loadState(params);
 }
 
@@ -128,7 +154,7 @@ function loadState(params) {
   if (params.has("state") && (params.has("code") || params.has("error"))) {
     // This is the OAuth callback
     handleLoginCallback(params);
-  } else if (mbid && mbidValid) {
+  } else if (mbid && !mbidInvalid) {
     handleRelease(params);
   } else {
     // Fallback: render index page
@@ -153,22 +179,176 @@ function checkLogin() {
 }
 
 function checkMbid(params) {
-  let newMbid = params.get("mbid");
-  if (!newMbid || newMbid == "") {
+  mbid = params.get("mbid");
+  mbidInvalid = true;
+
+  if (!mbid || mbid == "") {
     mbid = null;
-    mbidValid = true;
+    mbidInvalid = false;
     return;
   }
 
-  m = newMbid.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
-  if (m && m[1]) {
-    mbid = m[1];
-    mbidValid = true;
-    console.log("Got mbid: " + mbid);
-  } else {
+  let newMbid = parseMbid(mbid);
+  if (newMbid) {
     mbid = newMbid;
-    mbidValid = false;
+    mbidInvalid = false;
+    console.log("Got mbid: " + mbid);
+    params.set("mbid", mbid);
+    replaceState(params);
+    return;
   }
+}
+
+function parseMbid(str) {
+  let match = str.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return null;
+}
+
+function checkISRCs(release, params) {
+  isrcs = [];
+  anyISRCsValid = false;
+  
+  let isrcHistory = {};
+  // Initialize ISRC history with existing ISRCs on the release
+  for (let i = 0; i < release["media"].length; i++) {
+    let media = release["media"][i];
+    for (let j = 0; j < media["tracks"].length; j++) {
+      let recording = media["tracks"][j]["recording"];
+      for (let k = 0; k < recording["isrcs"].length; k++) {
+        isrcHistory[recording["isrcs"][i]] = true;
+      }
+    }
+  }
+
+  var linearcount = 0;
+  for (let i = 0; i < release["media"].length; i++) {
+    let media = release["media"][i];
+    isrcs[i] = [];
+
+    for (let j = 0; j < media["tracks"].length; j++) {
+      let track = media["tracks"][j];
+
+      linearcount++;
+      // Newer param name with multiple media support
+      let isrc = params.get("isrc" + (i+1) + "-" + (j+1));
+      if (!isrc) {
+        // Fallback param name that simply has isrcs in order
+        isrc = params.get("isrc" + linearcount);
+      }
+      let checks = null;
+
+      let checkedISRC = null;
+      if (isrc) {
+        checkedISRC = checkOneISRC(isrc, track["recording"], isrcHistory);
+        if (checkedISRC["isrc"] && !checkedISRC["invalid"]) {
+          anyISRCsValid = true;
+        }
+      } else {
+        checkedISRC = {isrc: null, invalid: false, checks: []};
+      }
+
+      isrcs[i][j] = checkedISRC;
+    }
+  }
+  console.log(isrcs);
+}
+
+var ccodesUpdated = '2015-01'; /* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf */
+var ccodes = [
+  'AL', 'DZ', 'AD', 'AO', 'AI', 'AG', 'AR', 'AM', 'AW', 'AU', 'AT', 'AZ',
+  'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BM', 'BO', 'BA', 'BR', 'BX',
+  'BG', 'BF',
+  'CM', 'CA', 'KY', 'CL', 'CN', 'TW', 'CO', 'CD', 'CI', 'HR', 'CU', 'CW',
+  'CY', 'CZ',
+  'DK', 'DM', 'DO',
+  'EC', 'EG', 'SV', 'EE', 'ET',
+  'FJ', 'FI', 'FR', 'FX', 'PF',
+  'GM', 'GE', 'DE', 'GH', 'GI', 'GR', 'GD', 'GT', 'GG', 'GY',
+  'HT', 'HN', 'HK', 'HU',
+  'IS', 'IN', 'ID', 'IR', 'IQ', 'IE', 'IL', 'IT',
+  'JM', 'JP', 'JE', 'JO',
+  'KZ', 'KE', 'KR',
+  'LA', 'LV', 'LB', 'LS', 'LI', 'LT', 'LU',
+  'MO', 'MK', 'MW', 'MY', 'MV', 'MT', 'MU', 'MX', 'MD', 'MC', 'ME', 'MS',
+  'MA', 'MZ',
+  'NA', 'NP', 'NL', 'NZ', 'NG', 'MP', 'NO',
+  'PK', 'PA', 'PG', 'PY', 'PE', 'PH', 'PL', 'PT', 'PR',
+  'QA',
+  'RO', 'RU',
+  'KN', 'LC', 'VC', 'SM', 'SA', 'SN', 'RS', 'SC', 'SL', 'SG', 'SX', 'SK',
+  'SI', 'SB', 'ZA', 'ES', 'LK', 'SZ', 'SE', 'CH',
+  'TZ', 'TH', 'TO', 'TT', 'TN', 'TR',
+  'UG', 'UA', 'AE', 'GB', 'UK', 'US', 'QM', 'QZ', 'UY', 'UZ',
+  'VU', 'VE', 'VN', 'VG',
+  'ZM', 'ZW',
+  'TC', /* TuneCore */
+  'DG', /* International use, includes Turks and Caicos Islands */
+  'ZZ', /* International use, individual allocations */
+  'CS', 'YU' /* Historical */
+];
+
+function checkOneISRC(isrc, recording, isrcHistory) {
+  let checks = [];
+
+  // Trim whitespace
+  isrc = isrc.trim();
+  // Remove punctuation and internal whitespace
+  isrc = isrc.replace(/[\s\.+-]/g, '');
+  // Ignore blank ISRCs
+  if (isrc == '') {
+    return {isrc: null, invalid: false, checks: checks};
+  }
+  // Uppercaseify
+  isrc = isrc.toUpperCase();
+
+  // Parse the ISRC fields
+  let match = isrc.match(/^([A-Z]{2})([A-Z0-9]{3})([0-9]{2})([0-9]{5})$/);
+  if (!match) {
+    checks.push({type: "danger", message: "ISRC is malformed"});
+    return {isrc: isrc, invalid: true, checks: checks};
+  }
+
+  let invalid = false;
+  if (match[2] == '000') {
+    checks.push({type: "warning", message: "Registrant code “" + match[2] + "” may indicate blank or dummy data"});
+  }
+  if ((match[1] == 'US' && match[2] == 'S1Z') ||
+      (match[1] == 'JM' && match[2] == 'K40') ||
+      (match[1] == 'NZ' && match[2] == 'AA0')) {
+    checks.push({type: "danger", message: "Country code “" + match[1] + "” registration code “" + match[2] + "” is reserved for documentation"});
+    invalid = true;
+  }
+  if (ccodes.indexOf(match[1]) === -1) {
+    checks.push({type: "warning", message: "Country code “" + match[1] + "” is not allocated by the IFPI (last updated " + ccodesUpdated + ")"});
+  }
+  if (match[1] == 'PR') {
+    checks.push({type: "info", message: "PR is a historical allocation for Puerto Rico, new recordings are expected to be US/QM/QZ"});
+  }
+  if (match[1] == 'TC') {
+    checks.push({type: "warning", message: "This is probably a TuneCore ID, not an ISRC"});
+  }
+  if (match[1] == 'CS' && (match[3] > 6 && match[3] < 86)) {
+    checks.push({type: "warning", message: "CS is a historical code for Serbia & Montenegro – recordings prior to 2006 only"});
+  }
+  if (match[1] == 'YU' && (match[3] > 3 && match[3] < 86)) {
+    checks.push({type: "warning", message: "YU is a historical code for Yugoslavia – recordings prior to 2003 only"});
+  }
+
+  // Add a message if the ISRC was already present
+  if (recording["isrcs"].indexOf(isrc) != -1) {
+    checks.push({type: "info", message: "This ISRC is already attached to this track (it will be skipped)"});
+    invalid = true;
+  // Check for duplicate ISRCs
+  } else if (isrcHistory[isrc]) {
+    checks.push({type: "warning", message: "This ISRC is repeated from another track"});
+  }
+  isrcHistory[isrc] = true;
+
+
+  return {isrc: isrc, invalid: invalid, checks: checks};
 }
 
 function doLogin() {
@@ -199,21 +379,21 @@ function handleLoginCallback(params) {
   var stateId = params.get('state');
   var state = JSON.parse(window.sessionStorage.getItem("mb_oauth_state"));
   if (state["stateId"] != stateId) {
-    return renderError("State returned from OAuth2 callback did not match saved state.");
+    return renderError("State returned from OAuth2 callback did not match saved state.", null);
   }
 
   var code = params.get('code');
   if (!code) {
-    return renderError("OAuth2 callback did not return a code. Error: " + params.get("error_description"));
+    return renderError("OAuth2 callback did not return a code. Error: " + params.get("error_description"), null);
   }
 
   console.log("restored state:", state);
 
   // Fetch the auth token and userinfo
   fetchAccessToken(code)
-    .catch(error => { renderError("When fetching OAuth2 token: " + error) })
+    .catch(error => { renderError("When fetching OAuth2 token: " + error, error) })
     .then(fetchUserinfo)
-    .catch(error => { renderError("When fetching OAuth2 userinfo: " + error) })
+    .catch(error => { renderError("When fetching OAuth2 userinfo: " + error, error) })
     .then(() => {
       // We want to do a full navigation here, so that a reload won't try
       // to fetch the access token again
@@ -250,12 +430,17 @@ function fetchUserinfo() {
     });
 }
 
-function handleRelease() {
+function handleRelease(params) {
+  renderReleaseProgress();
   fetchRelease(mbid)
     .then(release => {
+      checkISRCs(release, params);
       renderRelease(release);
     }, error => {
-      renderError("When fetching MusicBrainz release: " + error)
+      renderError("When fetching MusicBrainz release: " + error, error);
+    })
+    .catch(error => {
+      renderError("When displaying MusicBrainz release: " + error, error);
     });
 }
 
@@ -306,9 +491,26 @@ function doLogout() {
 }
 
 function doSubmitMbid() {
-  var mbid = document.getElementById("mbid").value;
-  var params = new URLSearchParams(window.location.search);
-  params.set("mbid", mbid);
+  let mbidSubmitBtn = document.getElementById("index-mbid-submit");
+  mbidSubmitBtn.disabled = true;
+
+  let newMbid = document.getElementById("mbid").value;
+  let parsedMbid = parseMbid(newMbid);
+  if (parsedMbid) {
+    newMbid = parsedMbid;
+  }
+
+  let params = new URLSearchParams(window.location.search);
+  params.set("mbid", newMbid);
+  pushState(params);
+}
+
+function doCheckIsrcs() {
+  let submitBtn = document.getElementById("check-isrcs-submit");
+  submitBtn.disabled = true;
+
+  let form = document.getElementById("check-isrcs");
+  let params = new URLSearchParams(new FormData(form));
   pushState(params);
 }
 
@@ -317,6 +519,7 @@ function renderIndex(params) {
   container.innerHTML = tmpl("template_index", {
     mbid: params.get("mbid") || ""
   });
+  restoreScrollPosition();
 }
 
 function renderNavbar() {
@@ -324,25 +527,46 @@ function renderNavbar() {
   var rootLocation = new URL(window.location);
   rootLocation.search = "";
   navbar.innerHTML = tmpl("template_navbar", {
-    login: login,
     rootLocation: rootLocation
   });
 }
 
 function renderLoginProgress() {
   document.getElementById("container").innerHTML = tmpl("template_login_progress", {});
+  resetScrollPosition();
 }
 
-function renderError(error) {
-  document.getElementById("container").innerHTML = tmpl("template_error", {error: error});
+function renderError(message, error) {
+  console.log(message);
+  console.log(error);
+  document.getElementById("container").innerHTML = tmpl("template_error", {error: message});
+  resetScrollPosition();
+}
+
+function renderReleaseProgress() {
+  document.getElementById("container").innerHTML = tmpl("template_release_progress", {});
+  resetScrollPosition();
 }
 
 function renderRelease(release) {
-  console.log("rendering the release!");
-  var container = document.getElementById("container");
+  let container = document.getElementById("container");
   container.innerHTML = tmpl("template_release", {
     release: release
   });
+  restoreScrollPosition();
+}
+
+function resetScrollPosition() {
+  window.scrollTo(0, 0);
+}
+
+function restoreScrollPosition() {
+  if (poppedState) {
+    console.log("restoring scroll position", poppedState);
+    window.scrollTo(+poppedState["scrollX"], +poppedState["scrollY"]);
+  } else {
+    resetScrollPosition();
+  }
 }
 
 </script>
@@ -353,11 +577,11 @@ function renderRelease(release) {
     <label for="mbid">Enter a release MBID:</label>
     <div class="form-row">
       <div class="col">
-        <input type="text" class="form-control form-control-lg<% if (!mbidValid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
+        <input type="text" class="form-control form-control-lg<% if (mbidInvalid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
         <div class="invalid-feedback">The provided value doesn’t contain an MBID</div>
       </div>
       <div class="col-auto">
-        <button type="submit" class="btn btn-lg btn-primary">Load</button>
+        <button id="index-mbid-submit" type="submit" class="btn btn-lg btn-primary">Load</button>
       </div>
     </div>
     <small class="form-text text-muted">
@@ -367,77 +591,138 @@ function renderRelease(release) {
 </form>
 </script>
 <script type="text/x-ejs" id="template_navbar">
-<a class="navbar-brand mr-auto" href="<%= escapeHtml(rootLocation) %>">kepstin’s MagicISRC</a>
+<a class="navbar-brand mr-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
 <% if (login.userInfo) { %>
   <span class="navbar-text" style="margin-right: 1em"><%= escapeHtml(login.userInfo.sub) %></span>
   <form class="form-inline">
-    <button class="btn btn-outline-dark" type="button" onClick="doLogout(); return false;">Logout</button>
+    <button class="btn btn-outline-light" type="button" onClick="doLogout(); return false;">Logout</button>
   </form>
 <% } else { %>
   <form class="form-inline">
-    <button class="btn btn-outline-dark" type="button" onClick="doLogin(); return false;">Login</button>
+    <button class="btn btn-outline-light" type="button" onClick="doLogin(); return false;">Login</button>
   </form>
 <% } %>
 </script>
 <script type="text/x-ejs" id="template_release">
-<h1 class="h3">
-  <%= escapeHtml(release["title"]) %><br>
+<h1 class="mb-4">
+  <a href="<%= new URL("release/" + release["id"], mb_site) %>"><%= escapeHtml(release["title"]) %></a><br>
   <small class="text-muted"><%= tmpl("template_ac", {ac: release["artist-credit"]}) %></small>
 </h1>
-<% for (var i = 0; i < release["media"].length; i++) { %>
-  <% var medium = release["media"][i]; %>
-  <h2 class="h5">
-    <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><%= medium["title"] ? ": " + escapeHtml(medium["title"]) : "" %>
-  </h2>
-  <table class="table">
-    <thead>
-      <th scope="col" class="col-1">#</th>
-      <th scope="col" class="col-5">Track</th>
-      <th scope="col" class="col-3">Existing ISRCs</th>
-      <th scope="col" class="col-3">New ISRC</th>
-    </thead>
-    <tbody>
-      <% for (var j = 0; j < medium["tracks"].length; j++) { %>
-        <% var track = medium["tracks"][j]; %>
-        <tr>
-          <th scope="row"><%= escapeHtml(track["number"]) %></th>
-          <td>
-            <%= escapeHtml(track["title"]) %><br>
-            <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
-          </td>
-          <td>
-            <ul class="list-unstyled">
-              <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
-                <li><%= escapeHtml(track["recording"]["isrcs"][k]) %></li>
-              <% } %>
-            </ul>
-          </td>
-          <td><input id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control" type="text"></td>
+<form id="check-isrcs" method="get" onsubmit="doCheckIsrcs(); return false;">
+  <input type="hidden" name="mbid" value="<%= release["id"] %>">
+  <% for (var i = 0; i < release["media"].length; i++) { %>
+    <% var medium = release["media"][i]; %>
+    <h2 class="">
+      <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><%= medium["title"] ? ": " + escapeHtml(medium["title"]) : "" %>
+    </h2>
+    <table class="d-block">
+      <thead class="d-block">
+        <tr class="row py-2 border-bottom">
+          <th scope="col" class="col-2 col-sm-1">#</th>
+          <th scope="col" class="col-10 col-sm-6">Track</th>
+          <th scope="col" class="col-10 offset-2 col-sm-5 offset-sm-0">ISRCs</th>
         </tr>
-      <% } %>
-    </tbody>
-  </table>
-<% } %>
+      </thead>
+      <tbody class="d-block">
+        <% for (var j = 0; j < medium["tracks"].length; j++) { %>
+          <% var track = medium["tracks"][j]; %>
+          <% var isrc = isrcs[i][j]; %>
+          <tr class="row py-2 border-top">
+            <th scope="row" class="col-2 col-sm-1"><%= escapeHtml(track["number"]) %></th>
+            <td class="col-10 col-sm-6">
+              <a href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a><br>
+              <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
+            </td>
+            <td class="col-10 offset-2 col-sm-5 offset-sm-0">
+              <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
+                <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
+                  <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
+                <% } %>
+              </ul>
+              <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
+              <% if (isrc["checks"].length > 0) { %>
+                <ul class="list-unstyled m-0">
+                  <% for (let c = 0; c < isrc["checks"].length; c++) { %>
+                    <% var check = isrc["checks"][c]; %>
+                    <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
+                  <% } %>
+                </ul>
+              <% } %>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  <% } %>
+  <div class="row">
+      <div class="col-12 col-sm-5 ml-auto">
+        <button id="check-isrcs-submit" type="submit" class="btn btn-primary">Check ISRCs &amp; Update Edit Preview</button>
+      </div>
+  </div>
+  <% if (anyISRCsValid) { %>
+    <h1>Edit Preview</h1>
+    <form id="edit-preview">
+      <div class="row">
+        <div class="col-12 col-sm-2 offset-md-1 text-right">
+          <strong>Additions:</strong>
+        </div>
+        <div class="col-12 col-sm-9">
+          <ul class="list-unstyled">
+          <% for (let i = 0; i < isrcs.length; i++) { %>
+            <% for (let j = 0; j < isrcs[i].length; j++) { %>
+              <% let isrc = isrcs[i][j]; %>
+              <% let recording = release["media"][i]["tracks"][j]["recording"]; %>
+              <% if (isrc["isrc"] && !isrc["invalid"]) { %>
+                <li>ISRC <samp><a href="<%= new URL("isrc/" + isrc["isrc"], mb_site) %>"><%= escapeHtml(isrc["isrc"]) %></a></samp> to <a href="<%= new URL("recording/" + recording["id"], mb_site) %>"><%= escapeHtml(recording["title"]) %></a> by <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %></li>
+              <% } %>
+            <% } %>
+          <% } %>
+          </ul>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12 col-sm-9 offset-sm-2 offset-md-3">
+          <% if (login.userInfo) { %>
+            Submit button goes here
+          <% } else { %>
+            <button class="btn btn-primary" type="button" onClick="doLogin(); return false;">Login to MusicBrainz</button>
+          <% } %>
+        </div>
+      </div>
+    </form>
+  <% } %>
+</form>
 </script>
 <script type="text/x-ejs" id="template_login_progress">
 <h2>Logging you in…</h2>
 </script>
-<script type="text/x-ejs" id="template_ac"><% for (var i = 0; i < ac.length; i++) { %><%= escapeHtml(ac[i]["name"]) %><%= escapeHtml(ac[i]["joinphrase"]) %><% } %></script>
+<script type="text/x-ejs" id="template_release_progress">
+<h2>Loading Release</h2>
+<div class="d-flex justify-content-center">
+  <div class="spinner-grow m-5"></div>
+</div>
+</script>
+<script type="text/x-ejs" id="template_ac"><% for (var i = 0; i < ac.length; i++) { %><a href="<%= new URL("artist/" + ac[i]["artist"]["id"], mb_site) %>"><%= escapeHtml(ac[i]["name"]) %></a><%= escapeHtml(ac[i]["joinphrase"]) %><% } %></script>
 <script type="text/x-ejs" id="template_error">
 <h2>A bad thing happened</h2>
 <p><%= escapeHtml("" + error) %></p>
 </script>
   </head>
   <body>
-<nav class="navbar navbar-light bg-light mb-3">
+<nav class="navbar navbar-dark bg-secondary mb-3">
   <div class="container" id="navbar">
     <span class="navbar-brand mr-auto">MagicISRC</span>
   </div>
 </nav>
 <div class="container" id="container">
-<h1>kepstin’s MagicISRC</h1>
-<p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
+  <h1>kepstin’s MagicISRC</h1>
+  <p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
 </div>
+<footer class="text-muted my-3">
+  <div class="container">
+    <p>Copyright Ⓒ2019 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>.</p>
+  </div>
+</footer>
 <script type="text/javascript">
 window.onpopstate = onPopState;
 onPopState();
