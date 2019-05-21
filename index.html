@@ -154,6 +154,8 @@ function loadState(params) {
   if (params.has("state") && (params.has("code") || params.has("error"))) {
     // This is the OAuth callback
     handleLoginCallback(params);
+  } else if (params.has("submit")) {
+    handleSubmit(params);
   } else if (mbid && !mbidInvalid) {
     handleRelease(params);
   } else {
@@ -481,7 +483,20 @@ function resolveWs2ResponseJson(response) {
       if (body["error"]) {
         return Promise.reject(new Error(body["error"]));
       }
-      return Promise.resolve(body);
+      return body;
+    });
+}
+
+function resolveWs2ResponseXml(response) {
+  return response.text()
+    .then(body => {
+      let parser = new DOMParser();
+      let doc = parser.parseFromString(body, "application/xml");
+      let firstChild = doc.firstElementChild;
+      if (firstChild.nodeName == "parseerror" && firstChild.namespaceURI == "http://www.mozilla.org/newlayout/xml/parsererror.xml") {
+        return Promise.reject(new Error(firstChild.textContent));
+      }
+      return doc;
     });
 }
 
@@ -512,6 +527,100 @@ function doCheckIsrcs() {
   let form = document.getElementById("check-isrcs");
   let params = new URLSearchParams(new FormData(form));
   pushState(params);
+}
+
+function doSubmitISRCs() {
+  let editSubmitBtn = document.getElementById("edit-submit");
+  editSubmitBtn.disabled = true;
+
+  renderSubmitProgress();
+
+  postISRCs()
+    .then(() => {
+      let params = new URLSearchParams(window.location.search);
+      params.set("submit", 1);
+      pushState(params);
+    })
+    .catch(error => {
+      renderError("When submitting ISRCs: " + error, error);
+    });
+}
+
+function postISRCs() {
+  let doc = buildISRCXML();
+  let body = new XMLSerializer().serializeToString(doc);
+  console.log(body);
+
+  // Load data for the requested release
+  var url = new URL("recording/", mb_ws2_base);
+  var params = url.searchParams;
+  params.set("client", "kepstin-magicisrc");
+  return window.fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + login["accessToken"],
+        "Content-Type": "application/xml"
+      },
+      body: body
+    })
+    .then(resolveWs2ResponseXml)
+    .then(response => {
+      console.log(response);
+    });
+}
+
+function buildISRCXML() {
+  // Invert the isrcs structure to be a map of isrcs per mbid
+  let recordingISRCMap = {};
+  for (let i = 0; i < isrcs.length; i++) {
+    for (let j = 0; j < isrcs[i].length; j++) {
+      let isrc = isrcs[i][j];
+      if (!isrc["isrc"] || isrc["invalid"]) {
+        continue;
+      }
+      let mbid = currentRelease["media"][i]["tracks"][j]["recording"]["id"];
+      if (!recordingISRCMap[mbid]) {
+        recordingISRCMap[mbid] = [];
+      }
+      recordingISRCMap[mbid].push(isrc["isrc"]);
+    }
+  }
+
+  // Create the XML document for the edit submission
+  let xmlns = "http://musicbrainz.org/ns/mmd-2.0#";
+  let doc = document.implementation.createDocument(xmlns, "", null);
+
+  let metadata = doc.createElementNS(xmlns, "metadata");
+  doc.appendChild(metadata);
+
+  let recordingList = doc.createElementNS(xmlns, "recording-list");
+  metadata.appendChild(recordingList);
+
+  for (let mbid in recordingISRCMap) {
+    let isrcs = recordingISRCMap[mbid];
+    console.log("mbid", mbid, "isrcs", isrcs);
+    let recording = doc.createElementNS(xmlns, "recording");
+    recording.setAttribute("id", mbid);
+    recordingList.appendChild(recording);
+
+    let isrcList = doc.createElementNS(xmlns, "isrc-list");
+    isrcList.setAttribute("count", isrcs.length);
+    recording.appendChild(isrcList);
+
+    for (let isrc of isrcs) {
+      let isrcEl = doc.createElementNS(xmlns, "isrc");
+      isrcEl.setAttribute("id", isrc);
+      isrcList.appendChild(isrcEl);
+    }
+  }
+
+  return doc;
+}
+
+function handleSubmit(params) {
+  var container = document.getElementById("container");
+  container.innerHTML = tmpl("template_submit", {});
+  restoreScrollPosition();
 }
 
 function renderIndex(params) {
@@ -556,6 +665,12 @@ function renderRelease(release) {
   restoreScrollPosition();
 }
 
+function renderSubmitProgress() {
+  let container = document.getElementById("container");
+  container.innerHTML = tmpl("template_submit_progress", {});
+  resetScrollPosition();
+}
+
 function resetScrollPosition() {
   window.scrollTo(0, 0);
 }
@@ -590,6 +705,12 @@ function restoreScrollPosition() {
   </div>
 </form>
 </script>
+<script type="text/x-ejs" id="template_submit">
+<p>The ISRCs have been successfully sumitted.</p>
+<% if (login.userInfo) { %>
+  <p><a href="<%= escapeHtml(mb_site) %>search/edits?order=desc&negation=0&combinator=and&conditions.0.field=editor&conditions.0.operator=%3D&conditions.0.name=<%= escapeHtml(login.userInfo.sub) %>&conditions.0.args.0=53217&conditions.1.field=type&conditions.1.operator=%3D&conditions.1.args=76">View your ISRC submission history.</a></p>
+<% } %>
+</script>
 <script type="text/x-ejs" id="template_navbar">
 <a class="navbar-brand mr-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
 <% if (login.userInfo) { %>
@@ -618,9 +739,9 @@ function restoreScrollPosition() {
     <table class="d-block">
       <thead class="d-block">
         <tr class="row py-2 border-bottom">
-          <th scope="col" class="col-2 col-sm-1">#</th>
-          <th scope="col" class="col-10 col-sm-6">Track</th>
-          <th scope="col" class="col-10 offset-2 col-sm-5 offset-sm-0">ISRCs</th>
+          <th scope="col" class="col-1 col-sm-1">#</th>
+          <th scope="col" class="col-11 col-sm-6">Track</th>
+          <th scope="col" class="col-11 offset-1 col-sm-5 offset-sm-0">ISRCs</th>
         </tr>
       </thead>
       <tbody class="d-block">
@@ -628,12 +749,12 @@ function restoreScrollPosition() {
           <% var track = medium["tracks"][j]; %>
           <% var isrc = isrcs[i][j]; %>
           <tr class="row py-2 border-top">
-            <th scope="row" class="col-2 col-sm-1"><%= escapeHtml(track["number"]) %></th>
-            <td class="col-10 col-sm-6">
+            <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
+            <td class="col-11 col-sm-6">
               <a href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a><br>
               <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
             </td>
-            <td class="col-10 offset-2 col-sm-5 offset-sm-0">
+            <td class="col-11 offset-1 col-sm-5 offset-sm-0">
               <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
                 <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
                   <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
@@ -655,41 +776,39 @@ function restoreScrollPosition() {
     </table>
   <% } %>
   <div class="row">
-      <div class="col-12 col-sm-5 ml-auto">
-        <button id="check-isrcs-submit" type="submit" class="btn btn-primary">Check ISRCs &amp; Update Edit Preview</button>
+      <div class="col-11 col-sm-5 offset-1 offset-sm-7">
+        <button id="check-isrcs-submit" type="submit" class="btn btn-primary">Check ISRCs &amp; update edit preview</button>
       </div>
   </div>
   <% if (anyISRCsValid) { %>
-    <h1>Edit Preview</h1>
-    <form id="edit-preview">
-      <div class="row">
-        <div class="col-12 col-sm-2 offset-md-1 text-right">
-          <strong>Additions:</strong>
-        </div>
-        <div class="col-12 col-sm-9">
-          <ul class="list-unstyled">
-          <% for (let i = 0; i < isrcs.length; i++) { %>
-            <% for (let j = 0; j < isrcs[i].length; j++) { %>
-              <% let isrc = isrcs[i][j]; %>
-              <% let recording = release["media"][i]["tracks"][j]["recording"]; %>
-              <% if (isrc["isrc"] && !isrc["invalid"]) { %>
-                <li>ISRC <samp><a href="<%= new URL("isrc/" + isrc["isrc"], mb_site) %>"><%= escapeHtml(isrc["isrc"]) %></a></samp> to <a href="<%= new URL("recording/" + recording["id"], mb_site) %>"><%= escapeHtml(recording["title"]) %></a> by <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %></li>
-              <% } %>
+    <h1 class="mt-3">Edit Preview</h1>
+    <div class="row">
+      <div class="col-12 col-sm-2 offset-lg-1">
+        <strong>Additions:</strong>
+      </div>
+      <div class="col-12 col-sm-10 col-lg-9">
+        <ul class="list-unstyled">
+        <% for (let i = 0; i < isrcs.length; i++) { %>
+          <% for (let j = 0; j < isrcs[i].length; j++) { %>
+            <% let isrc = isrcs[i][j]; %>
+            <% let recording = release["media"][i]["tracks"][j]["recording"]; %>
+            <% if (isrc["isrc"] && !isrc["invalid"]) { %>
+              <li>ISRC <samp><a href="<%= new URL("isrc/" + isrc["isrc"], mb_site) %>"><%= escapeHtml(isrc["isrc"]) %></a></samp> to <a href="<%= new URL("recording/" + recording["id"], mb_site) %>"><%= escapeHtml(recording["title"]) %></a> by <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %></li>
             <% } %>
           <% } %>
-          </ul>
-        </div>
+        <% } %>
+        </ul>
       </div>
-      <div class="row">
-        <div class="col-12 col-sm-9 offset-sm-2 offset-md-3">
-          <% if (login.userInfo) { %>
-            Submit button goes here
-          <% } else { %>
-            <button class="btn btn-primary" type="button" onClick="doLogin(); return false;">Login to MusicBrainz</button>
-          <% } %>
-        </div>
+    </div>
+    <div class="row">
+      <div class="col-12 col-sm-10 col-lg-9 offset-sm-2 offset-lg-3">
+        <% if (login.userInfo) { %>
+          <button id="edit-submit" class="btn btn-primary" type="button" onclick="doSubmitISRCs(); return false;">Enter edit</button>
+        <% } else { %>
+          <button class="btn btn-primary" type="button" onClick="doLogin(); return false;">Login to MusicBrainz</button>
+        <% } %>
       </div>
-    </form>
+    </div>
   <% } %>
 </form>
 </script>
@@ -698,9 +817,11 @@ function restoreScrollPosition() {
 </script>
 <script type="text/x-ejs" id="template_release_progress">
 <h2>Loading Release</h2>
-<div class="d-flex justify-content-center">
-  <div class="spinner-grow m-5"></div>
-</div>
+<div class="d-flex justify-content-center"><div class="spinner-grow m-5"></div></div>
+</script>
+<script type="text/x-ejs" id="template_submit_progress">
+<h2>Entering edits</h2>
+<div class="d-flex justify-content-center"><div class="spinner-grow m-5"></div></div>
 </script>
 <script type="text/x-ejs" id="template_ac"><% for (var i = 0; i < ac.length; i++) { %><a href="<%= new URL("artist/" + ac[i]["artist"]["id"], mb_site) %>"><%= escapeHtml(ac[i]["name"]) %></a><%= escapeHtml(ac[i]["joinphrase"]) %><% } %></script>
 <script type="text/x-ejs" id="template_error">
