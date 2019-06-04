@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>kepstin’s MagicISRC</title>
+    <title>kepstin’s MagicISRC (Beta)</title>
     <link rel="stylesheet" href="bootstrap.css">
 <script type="text/javascript">
 "use strict";
@@ -13,12 +13,12 @@ if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
 
 // Configuration
 
-var mb_site = new URL("https://test.musicbrainz.org/");
+var mb_site = new URL("https://beta.musicbrainz.org/");
 var mb_ws2_base = new URL("ws/2/", mb_site);
 var mb_oauth_base = new URL("oauth2/", mb_site);
 var mb_oauth_redirect_uri = "https://magicisrc-beta.kepstin.ca/";
-var mb_oauth_client_id = "sNuh2rVFO_RNUdNzj8wzMA";
-var mb_oauth_client_secret = "_1KuzAcMHqb-5VRdRsa61Q"; // Not so secret after all, are you?
+var mb_oauth_client_id = "flI-ayzX2u2pzMWosH27FQ";
+var mb_oauth_client_secret = "sGDt_ttwRSQ7K-hHoZA01A"; // Not so secret after all, are you?
 
 // Internal State
 
@@ -835,6 +835,11 @@ function restoreScrollPosition() {
     <span class="navbar-brand mr-auto">MagicISRC</span>
   </div>
 </nav>
+<div class="container">
+  <div class="alert alert-info" role="alert">
+    The Beta version of MagicISRC uses <a href="https://beta.musicbrainz.org">beta.musicbrainz.org</a> to allow testing new features with the live database.
+  </div>
+</div>
 <div class="container" id="container">
   <h1>kepstin’s MagicISRC</h1>
   <p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
