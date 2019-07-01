@@ -15,6 +15,7 @@ if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
 
 var mb_site = new URL("https://beta.musicbrainz.org/");
 var mb_ws2_base = new URL("ws/2/", mb_site);
+var mb_client = "kepstin-magicisrc-beta";
 var mb_oauth_base = new URL("oauth2/", mb_site);
 var mb_oauth_redirect_uri = "https://magicisrc-beta.kepstin.ca/";
 var mb_oauth_client_id = "flI-ayzX2u2pzMWosH27FQ";
@@ -554,7 +555,7 @@ function postISRCs() {
   // Load data for the requested release
   var url = new URL("recording/", mb_ws2_base);
   var params = url.searchParams;
-  params.set("client", "kepstin-magicisrc");
+  params.set("client", mb_client);
   return window.fetch(url, {
       method: "POST",
       headers: {
