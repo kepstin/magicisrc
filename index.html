@@ -258,7 +258,7 @@ function checkISRCs(release, params) {
   console.log(isrcs);
 }
 
-var ccodesUpdated = '2015-01'; /* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf */
+var ccodesUpdated = '2015-11-23'; /* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf Updated 23rd November 2015 */
 var ccodes = [
   'AL', 'DZ', 'AD', 'AO', 'AI', 'AG', 'AR', 'AM', 'AW', 'AU', 'AT', 'AZ',
   'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BM', 'BO', 'BA', 'BR', 'BX',
@@ -287,6 +287,7 @@ var ccodes = [
   'VU', 'VE', 'VN', 'VG',
   'ZM', 'ZW',
   'TC', /* TuneCore */
+  'CP', /* Reserved for future use */
   'DG', /* International use, includes Turks and Caicos Islands */
   'ZZ', /* International use, individual allocations */
   'CS', 'YU' /* Historical */
@@ -320,17 +321,20 @@ function checkOneISRC(isrc, recording, isrcHistory) {
   if ((match[1] == 'US' && match[2] == 'S1Z') ||
       (match[1] == 'JM' && match[2] == 'K40') ||
       (match[1] == 'NZ' && match[2] == 'AA0')) {
-    checks.push({type: "danger", message: "Country code “" + match[1] + "” registration code “" + match[2] + "” is reserved for documentation"});
+    checks.push({type: "danger", message: match[1] + " registration code “" + match[2] + "” is reserved for documentation"});
     invalid = true;
   }
   if (ccodes.indexOf(match[1]) === -1) {
-    checks.push({type: "warning", message: "Country code “" + match[1] + "” is not allocated by the IFPI (last updated " + ccodesUpdated + ")"});
+    checks.push({type: "danger", message: match[1] + " is not allocated by the IFPI (last updated " + ccodesUpdated + ")"});
   }
   if (match[1] == 'PR') {
     checks.push({type: "info", message: "PR is a historical allocation for Puerto Rico, new recordings are expected to be US/QM/QZ"});
   }
   if (match[1] == 'TC') {
-    checks.push({type: "warning", message: "This is probably a TuneCore ID, not an ISRC"});
+    checks.push({type: "info", message: "TC is allocated to TuneCore - Turks and Caicos Islands use DG"});
+  }
+  if (match[1] == 'CP') {
+    checks.push({type: "danger", message: "CP is reserved for future use by IFPI (last updated " + ccodesUpdated + ")"});
   }
   if (match[1] == 'CS' && (match[3] > 6 && match[3] < 86)) {
     checks.push({type: "warning", message: "CS is a historical code for Serbia & Montenegro – recordings prior to 2006 only"});
