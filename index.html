@@ -218,6 +218,10 @@ function checkISRCs(release, params) {
   // Initialize ISRC history with existing ISRCs on the release
   for (let i = 0; i < release["media"].length; i++) {
     let media = release["media"][i];
+    // Mediums from Musicbrainz with no tracks don't include the "tracks"
+    // property in the response at all; provide an empty array instead.
+    if (!media["tracks"]) { media["tracks"] = []; }
+
     for (let j = 0; j < media["tracks"].length; j++) {
       let recording = media["tracks"][j]["recording"];
       for (let k = 0; k < recording["isrcs"].length; k++) {
