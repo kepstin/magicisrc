@@ -745,44 +745,48 @@ function restoreScrollPosition() {
     <h2 class="">
       <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><%= medium["title"] ? ": " + escapeHtml(medium["title"]) : "" %>
     </h2>
-    <table class="d-block">
-      <thead class="d-block">
-        <tr class="row py-2 border-bottom">
-          <th scope="col" class="col-1 col-sm-1">#</th>
-          <th scope="col" class="col-11 col-sm-6">Track</th>
-          <th scope="col" class="col-11 offset-1 col-sm-5 offset-sm-0">ISRCs</th>
-        </tr>
-      </thead>
-      <tbody class="d-block">
-        <% for (var j = 0; j < medium["tracks"].length; j++) { %>
-          <% var track = medium["tracks"][j]; %>
-          <% var isrc = isrcs[i][j]; %>
-          <tr class="row py-2 border-top">
-            <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
-            <td class="col-11 col-sm-6">
-              <a href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a><br>
-              <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
-            </td>
-            <td class="col-11 offset-1 col-sm-5 offset-sm-0">
-              <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
-                <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
-                  <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
-                <% } %>
-              </ul>
-              <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
-              <% if (isrc["checks"].length > 0) { %>
-                <ul class="list-unstyled m-0">
-                  <% for (let c = 0; c < isrc["checks"].length; c++) { %>
-                    <% var check = isrc["checks"][c]; %>
-                    <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
+    <% if (medium["tracks"].length > 0) { %>
+      <table class="d-block mb-3">
+        <thead class="d-block">
+          <tr class="row py-2 border-bottom">
+            <th scope="col" class="col-1 col-sm-1">#</th>
+            <th scope="col" class="col-11 col-sm-6">Track</th>
+            <th scope="col" class="col-11 offset-1 col-sm-5 offset-sm-0">ISRCs</th>
+          </tr>
+        </thead>
+        <tbody class="d-block">
+          <% for (var j = 0; j < medium["tracks"].length; j++) { %>
+            <% var track = medium["tracks"][j]; %>
+            <% var isrc = isrcs[i][j]; %>
+            <tr class="row py-2 border-top">
+              <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
+              <td class="col-11 col-sm-6">
+                <a href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a><br>
+                <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
+              </td>
+              <td class="col-11 offset-1 col-sm-5 offset-sm-0">
+                <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
+                  <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
+                    <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
                   <% } %>
                 </ul>
-              <% } %>
-            </td>
-          </tr>
-        <% } %>
-      </tbody>
-    </table>
+                <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
+                <% if (isrc["checks"].length > 0) { %>
+                  <ul class="list-unstyled m-0">
+                    <% for (let c = 0; c < isrc["checks"].length; c++) { %>
+                      <% var check = isrc["checks"][c]; %>
+                      <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
+                    <% } %>
+                  </ul>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p>This medium has no tracks.</p>
+    <% } %>
   <% } %>
   <div class="row">
       <div class="col-11 col-sm-5 offset-1 offset-sm-7">
