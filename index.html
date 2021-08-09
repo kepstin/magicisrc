@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>kepstin’s MagicISRC</title>
     <link rel="stylesheet" href="bootstrap.css">
+    <link rel="stylesheet" href="fonts.css">
 <script type="text/javascript">
 "use strict";
 
@@ -102,8 +103,27 @@ function bufferToHex(buffer) {
 
 function generateStateId() {
   var stateArray = new Uint8Array(16);
-  window.crypto.getRandomValues(stateArray);
+  crypto.getRandomValues(stateArray);
   return bufferToHex(stateArray);
+}
+
+function bufferToBase64Url(buffer) {
+  return btoa(String.fromCharCode.apply(null, buffer))
+    .split("=", 1)[0]
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function generateCodeVerifier() {
+  var codeVerifierArray = new Uint8Array(32);
+  crypto.getRandomValues(codeVerifierArray);
+  return bufferToBase64Url(codeVerifierArray);
+}
+
+async function generateS256CodeChallenge(codeVerifier) {
+  var codeVerifierArray = new Uint8Array(codeVerifier.split("").map(c => c.charCodeAt(0)));
+  var codeChallengeArray = new Uint8Array(await crypto.subtle.digest("SHA-256", codeVerifierArray));
+  return bufferToBase64Url(codeChallengeArray);
 }
 
 var query = {};
@@ -218,6 +238,10 @@ function checkISRCs(release, params) {
   // Initialize ISRC history with existing ISRCs on the release
   for (let i = 0; i < release["media"].length; i++) {
     let media = release["media"][i];
+    // Mediums from Musicbrainz with no tracks don't include the "tracks"
+    // property in the response at all; provide an empty array instead.
+    if (!media["tracks"]) { media["tracks"] = []; }
+
     for (let j = 0; j < media["tracks"].length; j++) {
       let recording = media["tracks"][j]["recording"];
       for (let k = 0; k < recording["isrcs"].length; k++) {
@@ -360,24 +384,32 @@ function checkOneISRC(isrc, recording, isrcHistory) {
 
 function doLogin() {
   var stateId = generateStateId();
+
+  var codeVerifier = generateCodeVerifier();
+
   var state = {
     stateId: stateId,
     date: new Date().getTime(),
-    params: new URL(window.location).searchParams.toString()
+    params: new URL(window.location).searchParams.toString(),
+    codeVerifier: codeVerifier
   };
   window.sessionStorage.setItem("mb_oauth_state", JSON.stringify(state));
   console.log("saved state:", state);
 
-  var url = new URL("authorize", mb_oauth_base);
-  var params = url.searchParams;
-  params.set("response_type", "code");
-  params.set("client_id", mb_oauth_client_id);
-  params.set("redirect_uri", mb_oauth_redirect_uri);
-  params.set("scope", "profile submit_isrc");
-  params.set("approval_prompt", "force");
-  params.set("state", stateId);
+  generateS256CodeChallenge(codeVerifier).then(codeChallenge => {
+    var url = new URL("authorize", mb_oauth_base);
+    var params = url.searchParams;
+    params.set("response_type", "code");
+    params.set("client_id", mb_oauth_client_id);
+    params.set("redirect_uri", mb_oauth_redirect_uri);
+    params.set("scope", "profile submit_isrc");
+    params.set("approval_prompt", "force");
+    params.set("state", stateId);
+    params.set("code_challenge", codeChallenge);
+    params.set("code_challenge_method", "S256");
 
-  window.location = url;
+    window.location = url;
+  });
 }
 
 function handleLoginCallback(params) {
@@ -397,7 +429,7 @@ function handleLoginCallback(params) {
   console.log("restored state:", state);
 
   // Fetch the auth token and userinfo
-  fetchAccessToken(code)
+  fetchAccessToken(state, code)
     .catch(error => { renderError("When fetching OAuth2 token: " + error, error) })
     .then(fetchUserinfo)
     .catch(error => { renderError("When fetching OAuth2 userinfo: " + error, error) })
@@ -408,7 +440,7 @@ function handleLoginCallback(params) {
     });
 }
 
-function fetchAccessToken(code) {
+function fetchAccessToken(state, code) {
   var url = new URL("token", mb_oauth_base);
   var data = new URLSearchParams();
   data.set("grant_type", "authorization_code");
@@ -416,6 +448,7 @@ function fetchAccessToken(code) {
   data.set("client_id", mb_oauth_client_id);
   data.set("client_secret", mb_oauth_client_secret);
   data.set("redirect_uri", mb_oauth_redirect_uri);
+  data.set("code_verifier", state.codeVerifier);
   return window.fetch(url, { method: "POST", body: data })
     .then(resolveOauthResponse)
     .then(response => {
@@ -693,21 +726,19 @@ function restoreScrollPosition() {
 <script type="text/x-ejs" id="template_index">
 <p>MagicISRC is a tool that makes it easy to submit ISRCs for every track on a <a href="https://musicbrainz.org/">MusicBrainz</a> release.</p>
 <form method="get" onsubmit="doSubmitMbid(); return false;">
-  <div class="form-group">
-    <label for="mbid">Enter a release MBID:</label>
-    <div class="form-row">
-      <div class="col">
-        <input type="text" class="form-control form-control-lg<% if (mbidInvalid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
-        <div class="invalid-feedback">The provided value doesn’t contain an MBID</div>
-      </div>
-      <div class="col-auto">
-        <button id="index-mbid-submit" type="submit" class="btn btn-lg btn-primary">Load</button>
-      </div>
+  <h1 class="h3"><label for="mbid">Enter a release MBID:</label></h1>
+  <div class="row mb-3">
+    <div class="col">
+      <input type="text" class="form-control form-control-lg<% if (mbidInvalid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
+      <div class="invalid-feedback">The provided value doesn’t contain an MBID</div>
     </div>
-    <small class="form-text text-muted">
-      You can also paste in a URL to a release page, or any string containing a release MBID.
-    </small>
+    <div class="col-auto">
+      <button id="index-mbid-submit" type="submit" class="btn btn-lg btn-primary">Load</button>
+    </div>
   </div>
+  <small class="text-muted">
+    You can also paste in a URL to a release page, or any string containing a release MBID.
+  </small>
 </form>
 </script>
 <script type="text/x-ejs" id="template_submit">
@@ -717,9 +748,9 @@ function restoreScrollPosition() {
 <% } %>
 </script>
 <script type="text/x-ejs" id="template_navbar">
-<a class="navbar-brand mr-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
+<a class="navbar-brand me-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
 <% if (login.userInfo) { %>
-  <span class="navbar-text" style="margin-right: 1em"><%= escapeHtml(login.userInfo.sub) %></span>
+  <span class="navbar-text me-3"><%= escapeHtml(login.userInfo.sub) %></span>
   <form class="form-inline">
     <button class="btn btn-outline-light" type="button" onClick="doLogout(); return false;">Logout</button>
   </form>
@@ -730,63 +761,75 @@ function restoreScrollPosition() {
 <% } %>
 </script>
 <script type="text/x-ejs" id="template_release">
-<h1 class="mb-4">
-  <a href="<%= new URL("release/" + release["id"], mb_site) %>"><%= escapeHtml(release["title"]) %></a><br>
-  <small class="text-muted"><%= tmpl("template_ac", {ac: release["artist-credit"]}) %></small>
+<h1 class="h3">
+  <a class="text-decoration-none" href="<%= new URL("release/" + release["id"], mb_site) %>"><bdi><%= escapeHtml(release["title"]) %></bdi></a>
+  <% if (release["disambiguation"]) { %><small class="text-muted fs-6 fw-normal">(<bdi><%= escapeHtml(release["disambiguation"]) %></bid>)</small><% } %>
 </h1>
+<p class="mb-4"><span class="text-muted">~</span> Release by <%= tmpl("template_ac", {ac: release["artist-credit"]}) %></p>
 <form id="check-isrcs" method="get" onsubmit="doCheckIsrcs(); return false;">
   <input type="hidden" name="mbid" value="<%= release["id"] %>">
   <% for (var i = 0; i < release["media"].length; i++) { %>
     <% var medium = release["media"][i]; %>
-    <h2 class="">
+    <h2 class="h4">
       <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><%= medium["title"] ? ": " + escapeHtml(medium["title"]) : "" %>
     </h2>
-    <table class="d-block">
-      <thead class="d-block">
-        <tr class="row py-2 border-bottom">
-          <th scope="col" class="col-1 col-sm-1">#</th>
-          <th scope="col" class="col-11 col-sm-6">Track</th>
-          <th scope="col" class="col-11 offset-1 col-sm-5 offset-sm-0">ISRCs</th>
-        </tr>
-      </thead>
-      <tbody class="d-block">
-        <% for (var j = 0; j < medium["tracks"].length; j++) { %>
-          <% var track = medium["tracks"][j]; %>
-          <% var isrc = isrcs[i][j]; %>
-          <tr class="row py-2 border-top">
-            <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
-            <td class="col-11 col-sm-6">
-              <a href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a><br>
-              <small class="text-muted"><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></small>
-            </td>
-            <td class="col-11 offset-1 col-sm-5 offset-sm-0">
-              <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
-                <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
-                  <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
-                <% } %>
-              </ul>
-              <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
-              <% if (isrc["checks"].length > 0) { %>
-                <ul class="list-unstyled m-0">
-                  <% for (let c = 0; c < isrc["checks"].length; c++) { %>
-                    <% var check = isrc["checks"][c]; %>
-                    <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
+    <% if (medium["tracks"].length > 0) { %>
+      <table class="d-block mb-3">
+        <thead class="d-block">
+          <tr class="row py-2 border-bottom">
+            <th scope="col" class="col-1 col-sm-1">#</th>
+            <th scope="col" class="col-11 col-sm-6 col-md-7 col-lg-8 order-sm-2">
+              <div class="row">
+                <div class="col-lg-7">Track</div>
+                <div class="col-lg-5 d-none d-lg-block">Artist</div>
+              </div>
+            </th>
+            <th scope="col" class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">ISRCs</th>
+          </tr>
+        </thead>
+        <tbody class="d-block">
+          <% for (var j = 0; j < medium["tracks"].length; j++) { %>
+            <% var track = medium["tracks"][j]; %>
+            <% var isrc = isrcs[i][j]; %>
+            <tr class="row py-2 border-top">
+              <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
+              <td class="col-11 col-sm-6 col-md-7 col-lg-8 order-sm-2">
+                <div class="row">
+                  <div class="col-lg-7"><a class="text-decoration-none" href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a></div>
+                  <div class="col-lg-5"><span class="d-lg-none"><span class="text-muted">~</span> Track by </span><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></div>
+                </div>
+              </td>
+              <td class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">
+                <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
+                  <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
+                    <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
                   <% } %>
                 </ul>
-              <% } %>
-            </td>
-          </tr>
-        <% } %>
-      </tbody>
-    </table>
+                <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
+                <% if (isrc["checks"].length > 0) { %>
+                  <ul class="list-unstyled m-0">
+                    <% for (let c = 0; c < isrc["checks"].length; c++) { %>
+                      <% var check = isrc["checks"][c]; %>
+                      <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
+                    <% } %>
+                  </ul>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p class="text-muted">(no tracks)</p>
+    <% } %>
   <% } %>
   <div class="row">
-      <div class="col-11 col-sm-5 offset-1 offset-sm-7">
+      <div class="col-11 col-sm-5 col-md-4 col-lg-3 offset-sm-1">
         <button id="check-isrcs-submit" type="submit" class="btn btn-primary">Check ISRCs &amp; update edit preview</button>
       </div>
   </div>
   <% if (anyISRCsValid) { %>
-    <h1 class="mt-3">Edit Preview</h1>
+    <h1 class="mt-3 h3">Edit Preview</h1>
     <div class="row">
       <div class="col-12 col-sm-2 offset-lg-1">
         <strong>Additions:</strong>
@@ -798,7 +841,7 @@ function restoreScrollPosition() {
             <% let isrc = isrcs[i][j]; %>
             <% let recording = release["media"][i]["tracks"][j]["recording"]; %>
             <% if (isrc["isrc"] && !isrc["invalid"]) { %>
-              <li>ISRC <samp><a href="<%= new URL("isrc/" + isrc["isrc"], mb_site) %>"><%= escapeHtml(isrc["isrc"]) %></a></samp> to <a href="<%= new URL("recording/" + recording["id"], mb_site) %>"><%= escapeHtml(recording["title"]) %></a> by <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %></li>
+              <li>ISRC <samp><a class="text-decoration-none" href="<%= new URL("isrc/" + isrc["isrc"], mb_site) %>"><%= escapeHtml(isrc["isrc"]) %></a></samp> to <a class="text-decoration-none" href="<%= new URL("recording/" + recording["id"], mb_site) %>"><bdi><%= escapeHtml(recording["title"]) %></bdi></a> by <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %></li>
             <% } %>
           <% } %>
         <% } %>
@@ -818,19 +861,19 @@ function restoreScrollPosition() {
 </form>
 </script>
 <script type="text/x-ejs" id="template_login_progress">
-<h2>Logging you in…</h2>
+<h1 class="h3">Logging you in…</h1>
 </script>
 <script type="text/x-ejs" id="template_release_progress">
-<h2>Loading Release</h2>
+<h1 class="h3">Loading Release</h1>
 <div class="d-flex justify-content-center"><div class="spinner-grow m-5"></div></div>
 </script>
 <script type="text/x-ejs" id="template_submit_progress">
-<h2>Entering edits</h2>
+<h1 class="h3">Entering edits</h1>
 <div class="d-flex justify-content-center"><div class="spinner-grow m-5"></div></div>
 </script>
-<script type="text/x-ejs" id="template_ac"><% for (var i = 0; i < ac.length; i++) { %><a href="<%= new URL("artist/" + ac[i]["artist"]["id"], mb_site) %>"><%= escapeHtml(ac[i]["name"]) %></a><%= escapeHtml(ac[i]["joinphrase"]) %><% } %></script>
+<script type="text/x-ejs" id="template_ac"><% for (var i = 0; i < ac.length; i++) { %><a class="text-decoration-none" href="<%= new URL("artist/" + ac[i]["artist"]["id"], mb_site) %>"><bdi><%= escapeHtml(ac[i]["name"]) %></bdi></a><bdi><%= escapeHtml(ac[i]["joinphrase"]) %></bdi><% } %></script>
 <script type="text/x-ejs" id="template_error">
-<h2>A bad thing happened</h2>
+<h1 class="h3">An error occured</h1>
 <p><%= escapeHtml("" + error) %></p>
 </script>
   </head>
@@ -841,13 +884,12 @@ function restoreScrollPosition() {
   </div>
 </nav>
 <div class="container" id="container">
-  <h1>kepstin’s MagicISRC</h1>
+  <h1 class="h3">kepstin’s MagicISRC</h1>
   <p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
 </div>
 <footer class="text-muted my-3">
   <div class="container">
-    <p><a href="privacy.html">Privacy Policy</a></p>
-    <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>.</p>
+    <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>. Read the <a href="privacy.html">Privacy Policy</a>.</p>
   </div>
 </footer>
 <script type="text/javascript">
