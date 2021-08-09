@@ -753,9 +753,9 @@ function restoreScrollPosition() {
 <% } %>
 </script>
 <script type="text/x-ejs" id="template_navbar">
-<a class="navbar-brand mr-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
+<a class="navbar-brand me-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
 <% if (login.userInfo) { %>
-  <span class="navbar-text" style="margin-right: 1em"><%= escapeHtml(login.userInfo.sub) %></span>
+  <span class="navbar-text me-3"><%= escapeHtml(login.userInfo.sub) %></span>
   <form class="form-inline">
     <button class="btn btn-outline-light" type="button" onClick="doLogout(); return false;">Logout</button>
   </form>
