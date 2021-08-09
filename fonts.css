@@ -1,0 +1,26 @@
+@font-face {
+  font-family: Inter;
+  src: url("fonts/Inter-roman.var.woff2?v=3.19") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: Inconsolata;
+  src: url("fonts/Inconsolata-VF.woff2?v=3.000") format("woff2");
+  font-style: normal;
+  font-weight: 275 900;
+  font-stretch: 50% 200%;
+  font-display: fallback;
+}
+
+:root {
+  font-size: 14px;
+  --bs-font-sans-serif: Inter, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  --bs-font-monospace: Inconsolata, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Source Code Pro", "Liberation Mono", monospace;
+}
+
+samp, samp .form-control {
+  font-weight: 500;
+}
