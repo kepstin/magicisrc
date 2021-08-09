@@ -755,13 +755,13 @@ function restoreScrollPosition() {
         <thead class="d-block">
           <tr class="row py-2 border-bottom">
             <th scope="col" class="col-1 col-sm-1">#</th>
-            <th scope="col" class="col-11 col-sm-6 col-md-7 col-lg-8">
+            <th scope="col" class="col-11 col-sm-6 col-md-7 col-lg-8 order-sm-2">
               <div class="row">
                 <div class="col-lg-7">Track</div>
                 <div class="col-lg-5 d-none d-lg-block">Artist</div>
               </div>
             </th>
-            <th scope="col" class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 offset-sm-0">ISRCs</th>
+            <th scope="col" class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">ISRCs</th>
           </tr>
         </thead>
         <tbody class="d-block">
@@ -770,13 +770,13 @@ function restoreScrollPosition() {
             <% var isrc = isrcs[i][j]; %>
             <tr class="row py-2 border-top">
               <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
-              <td class="col-11 col-sm-6 col-md-7 col-lg-8">
+              <td class="col-11 col-sm-6 col-md-7 col-lg-8 order-sm-2">
                 <div class="row">
                   <div class="col-lg-7"><a class="text-decoration-none" href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a></div>
                   <div class="col-lg-5"><span class="d-lg-none"><span class="text-muted">~</span> Track by </span><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></div>
                 </div>
               </td>
-              <td class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 offset-sm-0">
+              <td class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">
                 <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
                   <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
                     <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
@@ -801,7 +801,7 @@ function restoreScrollPosition() {
     <% } %>
   <% } %>
   <div class="row">
-      <div class="col-11 col-sm-5 col-md-4 col-lg-3 offset-sm-7 offset-md-8 offset-lg-9">
+      <div class="col-11 col-sm-5 col-md-4 col-lg-3 offset-sm-1">
         <button id="check-isrcs-submit" type="submit" class="btn btn-primary">Check ISRCs &amp; update edit preview</button>
       </div>
   </div>
