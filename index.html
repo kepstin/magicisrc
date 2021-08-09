@@ -108,8 +108,27 @@ function bufferToHex(buffer) {
 
 function generateStateId() {
   var stateArray = new Uint8Array(16);
-  window.crypto.getRandomValues(stateArray);
+  crypto.getRandomValues(stateArray);
   return bufferToHex(stateArray);
+}
+
+function bufferToBase64Url(buffer) {
+  return btoa(String.fromCharCode.apply(null, buffer))
+    .split("=", 1)[0]
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function generateCodeVerifier() {
+  var codeVerifierArray = new Uint8Array(32);
+  crypto.getRandomValues(codeVerifierArray);
+  return bufferToBase64Url(codeVerifierArray);
+}
+
+async function generateS256CodeChallenge(codeVerifier) {
+  var codeVerifierArray = new Uint8Array(codeVerifier.split("").map(c => c.charCodeAt(0)));
+  var codeChallengeArray = new Uint8Array(await crypto.subtle.digest("SHA-256", codeVerifierArray));
+  return bufferToBase64Url(codeChallengeArray);
 }
 
 var query = {};
@@ -370,24 +389,32 @@ function checkOneISRC(isrc, recording, isrcHistory) {
 
 function doLogin() {
   var stateId = generateStateId();
+
+  var codeVerifier = generateCodeVerifier();
+
   var state = {
     stateId: stateId,
     date: new Date().getTime(),
-    params: new URL(window.location).searchParams.toString()
+    params: new URL(window.location).searchParams.toString(),
+    codeVerifier: codeVerifier
   };
   window.sessionStorage.setItem("mb_oauth_state", JSON.stringify(state));
   console.log("saved state:", state);
 
-  var url = new URL("authorize", mb_oauth_base);
-  var params = url.searchParams;
-  params.set("response_type", "code");
-  params.set("client_id", mb_oauth_client_id);
-  params.set("redirect_uri", mb_oauth_redirect_uri);
-  params.set("scope", "profile submit_isrc");
-  params.set("approval_prompt", "force");
-  params.set("state", stateId);
+  generateS256CodeChallenge(codeVerifier).then(|codeChallenge| => {
+    var url = new URL("authorize", mb_oauth_base);
+    var params = url.searchParams;
+    params.set("response_type", "code");
+    params.set("client_id", mb_oauth_client_id);
+    params.set("redirect_uri", mb_oauth_redirect_uri);
+    params.set("scope", "profile submit_isrc");
+    params.set("approval_prompt", "force");
+    params.set("state", stateId);
+    params.set("code_challenge", codeChallenge);
+    params.set("code_challenge_method", "S256");
 
-  window.location = url;
+    window.location = url;
+  });
 }
 
 function handleLoginCallback(params) {
@@ -407,7 +434,7 @@ function handleLoginCallback(params) {
   console.log("restored state:", state);
 
   // Fetch the auth token and userinfo
-  fetchAccessToken(code)
+  fetchAccessToken(state, code)
     .catch(error => { renderError("When fetching OAuth2 token: " + error, error) })
     .then(fetchUserinfo)
     .catch(error => { renderError("When fetching OAuth2 userinfo: " + error, error) })
@@ -418,7 +445,7 @@ function handleLoginCallback(params) {
     });
 }
 
-function fetchAccessToken(code) {
+function fetchAccessToken(state, code) {
   var url = new URL("token", mb_oauth_base);
   var data = new URLSearchParams();
   data.set("grant_type", "authorization_code");
@@ -426,6 +453,7 @@ function fetchAccessToken(code) {
   data.set("client_id", mb_oauth_client_id);
   data.set("client_secret", mb_oauth_client_secret);
   data.set("redirect_uri", mb_oauth_redirect_uri);
+  data.set("code_verifier", state.codeVerifier);
   return window.fetch(url, { method: "POST", body: data })
     .then(resolveOauthResponse)
     .then(response => {
