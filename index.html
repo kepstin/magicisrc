@@ -401,7 +401,7 @@ function doLogin() {
   window.sessionStorage.setItem("mb_oauth_state", JSON.stringify(state));
   console.log("saved state:", state);
 
-  generateS256CodeChallenge(codeVerifier).then(|codeChallenge| => {
+  generateS256CodeChallenge(codeVerifier).then(codeChallenge => {
     var url = new URL("authorize", mb_oauth_base);
     var params = url.searchParams;
     params.set("response_type", "code");
