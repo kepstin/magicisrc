@@ -215,7 +215,6 @@ function checkMbid(params) {
   if (newMbid) {
     mbid = newMbid;
     mbidInvalid = false;
-    console.log("Got mbid: " + mbid);
     params.set("mbid", mbid);
     replaceState(params);
     return;
@@ -663,6 +662,25 @@ function handleSubmit(params) {
   restoreScrollPosition();
 }
 
+function handleISRCPaste(event) {
+  let text = event.clipboardData.getData("text").split(/\r\n|\r|\n/);
+  if (text.length == 1) { return; }
+  event.preventDefault();
+
+  let input = event.target;
+  let line = text.shift();
+  input.setRangeText(line, input.selectionStart, input.selectionEnd, "end");
+
+  while (text.length > 0) {
+    line = text.shift();
+    input = getNextISRCInput(input);
+    if (!input) { return; }
+
+    input.value = line;
+    input.focus();
+  }
+}
+
 function handleISRCKeydown(event) {
   let code = event.code;
   let input = event.target;
@@ -775,6 +793,7 @@ function renderRelease(release) {
   document.getElementById("check-isrcs").onsubmit = doCheckIsrcs;
   document.getElementById("check-isrcs-submit").onkeydown = handleCheckISRCKeydown;
   document.querySelectorAll("[data-isrc]").forEach(el => {
+    el.onpaste = handleISRCPaste;
     el.onkeydown = handleISRCKeydown;
   })
   restoreScrollPosition();
@@ -930,7 +949,7 @@ function restoreScrollPosition() {
         <% if (login.userInfo) { %>
           <button id="edit-submit" class="btn btn-primary" type="button" onclick="doSubmitISRCs(); return false;">Enter edit</button>
         <% } else { %>
-          <button class="btn btn-primary" type="button" onClick="doLogin(); return false;">Login to MusicBrainz</button>
+          <button class="btn btn-primary" type="button" onclick="doLogin(); return false;">Login to MusicBrainz</button>
         <% } %>
       </div>
     </div>
