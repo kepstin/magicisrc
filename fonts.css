@@ -22,16 +22,19 @@
   --bs-blue: #2A7BDE;
   --bs-red: #C01C28;
   --bs-yellow: #A2734C;
+  --bs-green: #26A269;
   --bs-cyan: #2AA1B3;
   --bs-gray: #5E5C64;
   --bs-primary: #2A7BDE;
   --bs-secondary: #5E5C64;
+  --bs-success: #26A269;
   --bs-info: #2AA1B3;
   --bs-warning: #A2734C;
   --bs-danger: #C01C28;
   --bs-body-rgb: 0, 0, 0;
   --bs-primary-rgb: 42, 123, 222;
   --bs-secondary-rgb: 94, 92, 100;
+  --bs-success-rgb: 38, 162, 105;
   --bs-info-rgb: 42, 161, 179;
   --bs-warning-rgb: 162, 115, 76;
   --bs-danger-rgb: 192, 28, 40;
@@ -61,4 +64,33 @@ samp, samp .form-control {
 
 .form-control, .form-control:focus {
   color: var(--bs-body-color);
+}
+
+.form-control[data-check="danger"] {
+  border-color: var(--bs-danger);
+}
+.form-control[data-check="danger"]:focus {
+  border-color: var(--bs-danger);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), 0.25);
+}
+.form-control[data-check="warning"] {
+  border-color: var(--bs-warning);
+}
+.form-control[data-check="warning"]:focus {
+  border-color: var(--bs-warning);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-warning-rgb), 0.25);
+}
+.form-control[data-check="info"] {
+  border-color: var(--bs-info);
+}
+.form-control[data-check="info"]:focus {
+  border-color: var(--bs-info);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-info-rgb), 0.25);
+}
+.form-control[data-check="success"] {
+  border-color: var(--bs-success);
+}
+.form-control[data-check="success"]:focus {
+  border-color: var(--bs-success);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-success-rgb), 0.25);
 }

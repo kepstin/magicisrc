@@ -343,21 +343,18 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   isrc = isrc.trim().replace(/[\s\.+-]/g, '').toUpperCase();
   // Ignore blank ISRCs
   if (isrc == '') {
-    return {isrc: null, invalid: false, checks: checks};
+    return {isrc: null, invalid: false, checkType: "", checks: checks};
   }
 
   // Parse the ISRC fields
   const match = isrc.match(/^([A-Z]{2})([A-Z0-9]{3})([0-9]{2})([0-9]{5})$/);
   if (!match) {
     checks.push({type: "danger", message: "ISRC is malformed"});
-    return {isrc: isrc, invalid: true, checks: checks};
+    return {isrc: isrc, invalid: true, checkType: "danger", checks: checks};
   }
   const [, country, registrant, year, designation] = match;
 
   let invalid = false;
-  if (registrant == '000') {
-    checks.push({type: "warning", message: `Registrant code “${registrant}” may indicate blank or dummy data`});
-  }
   if ((country == 'US' && registrant == 'S1Z') ||
       (country == 'JM' && registrant == 'K40') ||
       (country == 'NZ' && registrant == 'AA0')) {
@@ -367,14 +364,11 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   if (ccodes.indexOf(country) === -1) {
     checks.push({type: "danger", message: `${country} is not allocated by the IFPI (last updated ${ccodesUpdated})`});
   }
-  if (country == 'PR') {
-    checks.push({type: "info", message: "PR is a historical allocation for Puerto Rico, new recordings are expected to be US/QM/QZ"});
-  }
-  if (country == 'TC') {
-    checks.push({type: "info", message: "TC is allocated to TuneCore - Turks and Caicos Islands use DG"});
-  }
   if (country == 'CP') {
     checks.push({type: "danger", message: "CP is reserved for future use by IFPI (last updated ${ccodesUpdated})"});
+  }
+  if (registrant == '000') {
+    checks.push({type: "warning", message: `Registrant code “${registrant}” may indicate blank or dummy data`});
   }
   if (country == 'CS' && (year > 6 && year < 86)) {
     checks.push({type: "warning", message: "CS is a historical code for Serbia & Montenegro – recordings prior to 2006 only"});
@@ -393,7 +387,19 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   }
   isrcHistory[isrc] = {medium: `${medium.format ?? "Medium"} ${medium.position}`, track: track.number};
 
-  return {isrc: isrc, invalid: invalid, checks: checks};
+  if (country == 'PR') {
+    checks.push({type: "info", message: "PR is a historical allocation for Puerto Rico, new recordings are expected to be US/QM/QZ"});
+  }
+  if (country == 'TC') {
+    checks.push({type: "info", message: "TC is allocated to TuneCore - Turks and Caicos Islands use DG"});
+  }
+
+  return {
+    isrc: isrc,
+    invalid: invalid,
+    checkType: checks.length > 0 ? checks[0].type : "success",
+    checks: checks
+  };
 }
 
 function doLogin() {
@@ -969,6 +975,7 @@ function restoreScrollPosition() {
         name="isrc<%= medium.position %>-<%= track.position %>"
         id="isrc<%= medium.position %>-<%= track.position %>"
         data-isrc data-medium="<%= medium.position %>" data-track="<%= track.position %>"
+        data-check="<%= isrc.checkType %>"
         class="form-control my-2" type="text"
         value="<%= escapeHtml(isrc.isrc ? isrc.isrc : "") %>"></samp>
       <% if (isrc["checks"].length > 0) { %>
