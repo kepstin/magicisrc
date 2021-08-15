@@ -43,6 +43,11 @@ var currentRelease = {};
 //           type: One of "danger", "warning", "info"
 //           message: A human-readable check message
 var isrcs = null;
+// List of ISRCs for pregap tracks. Structure is as follows:
+// Array of media, each containing:
+//   Object, with properties:
+//     (same as in `isrcs`)
+var pregapISRCs = null;
 // True if any ISRCs are valid, and the edit preview should be shown
 var anyISRCsValid = false;
 // State from the most recently popped history
@@ -232,45 +237,58 @@ function parseMbid(str) {
 
 function checkISRCs(release, params) {
   isrcs = [];
+  pregapISRCs = [];
   anyISRCsValid = false;
 
   let isrcHistory = {};
   // Initialize ISRC history with existing ISRCs on the release
-  for (let i = 0; i < release["media"].length; i++) {
-    let media = release["media"][i];
+  for (const medium of release.media) {
     // Mediums from Musicbrainz with no tracks don't include the "tracks"
     // property in the response at all; provide an empty array instead.
-    if (!media["tracks"]) { media["tracks"] = []; }
+    if (!medium.tracks) { medium.tracks = []; }
 
-    for (let j = 0; j < media["tracks"].length; j++) {
-      let recording = media["tracks"][j]["recording"];
-      for (let k = 0; k < recording["isrcs"].length; k++) {
-        isrcHistory[recording["isrcs"][i]] = true;
+    if (medium.pregap) {
+      for (const isrc of medium.pregap.recording.isrcs) {
+        isrcHistory[isrc] = {medium: `${medium.format ?? "Medium"} ${medium.position}`, track: medium.pregap.number};
+      }
+    }
+    for (const track of medium.tracks) {
+      for (const isrc of track.recording.isrcs) {
+        isrcHistory[isrc] = {medium: `${medium.format ?? "Medium"} ${medium.position}`, track: track.number};
       }
     }
   }
 
   var linearcount = 0;
-  for (let i = 0; i < release["media"].length; i++) {
-    let media = release["media"][i];
+  for (const [i, medium] of release.media.entries()) {
     isrcs[i] = [];
+    pregapISRCs[i] = null;
 
-    for (let j = 0; j < media["tracks"].length; j++) {
-      let track = media["tracks"][j];
+    if (medium.pregap) {
+      let isrc = params.get(`isrc${medium.position}-${medium.pregap.position}`);
 
-      linearcount++;
-      // Newer param name with multiple media support
-      let isrc = params.get("isrc" + (i+1) + "-" + (j+1));
-      if (!isrc) {
-        // Fallback param name that simply has isrcs in order
-        isrc = params.get("isrc" + linearcount);
-      }
-      let checks = null;
-
-      let checkedISRC = null;
+      let checkedISRC;
       if (isrc) {
-        checkedISRC = checkOneISRC(isrc, track["recording"], isrcHistory);
-        if (checkedISRC["isrc"] && !checkedISRC["invalid"]) {
+        checkedISRC = checkOneISRC(isrc, medium, medium.pregap, isrcHistory);
+        if (checkedISRC.isrc && !checkedISRC.invalid) {
+          anyISRCsValid = true;
+        }
+      } else {
+        checkedISRC = {isrc: null, invalid: false, checks: []};
+      }
+
+      pregapISRCs[i] = checkedISRC;
+    }
+
+    for (const [j, track] of medium.tracks.entries()) {
+      linearcount++;
+      let isrc = params.get(`isrc${medium.position}-${track.position}`);
+      if (!isrc) { isrc = params.get(`isrc${linearcount}`); }
+
+      let checkedISRC;
+      if (isrc) {
+        checkedISRC = checkOneISRC(isrc, medium, track, isrcHistory);
+        if (checkedISRC.isrc && !checkedISRC.invalid) {
           anyISRCsValid = true;
         }
       } else {
@@ -280,7 +298,7 @@ function checkISRCs(release, params) {
       isrcs[i][j] = checkedISRC;
     }
   }
-  console.log(isrcs);
+  console.log(pregapISRCs, isrcs);
 }
 
 var ccodesUpdated = '2021-05-25'; /* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf Updated May 25 2021 */
@@ -318,66 +336,62 @@ var ccodes = [
   'CS', 'YU' /* Historical */
 ];
 
-function checkOneISRC(isrc, recording, isrcHistory) {
+function checkOneISRC(isrc, medium, track, isrcHistory) {
   let checks = [];
 
-  // Trim whitespace
-  isrc = isrc.trim();
-  // Remove punctuation and internal whitespace
-  isrc = isrc.replace(/[\s\.+-]/g, '');
+  // Normalize ISRC formatting
+  isrc = isrc.trim().replace(/[\s\.+-]/g, '').toUpperCase();
   // Ignore blank ISRCs
   if (isrc == '') {
     return {isrc: null, invalid: false, checks: checks};
   }
-  // Uppercaseify
-  isrc = isrc.toUpperCase();
 
   // Parse the ISRC fields
-  let match = isrc.match(/^([A-Z]{2})([A-Z0-9]{3})([0-9]{2})([0-9]{5})$/);
+  const match = isrc.match(/^([A-Z]{2})([A-Z0-9]{3})([0-9]{2})([0-9]{5})$/);
   if (!match) {
     checks.push({type: "danger", message: "ISRC is malformed"});
     return {isrc: isrc, invalid: true, checks: checks};
   }
+  const [, country, registrant, year, designation] = match;
 
   let invalid = false;
-  if (match[2] == '000') {
-    checks.push({type: "warning", message: "Registrant code “" + match[2] + "” may indicate blank or dummy data"});
+  if (registrant == '000') {
+    checks.push({type: "warning", message: `Registrant code “${registrant}” may indicate blank or dummy data`});
   }
-  if ((match[1] == 'US' && match[2] == 'S1Z') ||
-      (match[1] == 'JM' && match[2] == 'K40') ||
-      (match[1] == 'NZ' && match[2] == 'AA0')) {
-    checks.push({type: "danger", message: match[1] + " registration code “" + match[2] + "” is reserved for documentation"});
+  if ((country == 'US' && registrant == 'S1Z') ||
+      (country == 'JM' && registrant == 'K40') ||
+      (country == 'NZ' && registrant == 'AA0')) {
+    checks.push({type: "danger", message: `${country} registration code “${registrant}” is reserved for documentation`});
     invalid = true;
   }
-  if (ccodes.indexOf(match[1]) === -1) {
-    checks.push({type: "danger", message: match[1] + " is not allocated by the IFPI (last updated " + ccodesUpdated + ")"});
+  if (ccodes.indexOf(country) === -1) {
+    checks.push({type: "danger", message: `${country} is not allocated by the IFPI (last updated ${ccodesUpdated})`});
   }
-  if (match[1] == 'PR') {
+  if (country == 'PR') {
     checks.push({type: "info", message: "PR is a historical allocation for Puerto Rico, new recordings are expected to be US/QM/QZ"});
   }
-  if (match[1] == 'TC') {
+  if (country == 'TC') {
     checks.push({type: "info", message: "TC is allocated to TuneCore - Turks and Caicos Islands use DG"});
   }
-  if (match[1] == 'CP') {
-    checks.push({type: "danger", message: "CP is reserved for future use by IFPI (last updated " + ccodesUpdated + ")"});
+  if (country == 'CP') {
+    checks.push({type: "danger", message: "CP is reserved for future use by IFPI (last updated ${ccodesUpdated})"});
   }
-  if (match[1] == 'CS' && (match[3] > 6 && match[3] < 86)) {
+  if (country == 'CS' && (year > 6 && year < 86)) {
     checks.push({type: "warning", message: "CS is a historical code for Serbia & Montenegro – recordings prior to 2006 only"});
   }
-  if (match[1] == 'YU' && (match[3] > 3 && match[3] < 86)) {
+  if (country == 'YU' && (year > 3 && year < 86)) {
     checks.push({type: "warning", message: "YU is a historical code for Yugoslavia – recordings prior to 2003 only"});
   }
 
   // Add a message if the ISRC was already present
-  if (recording["isrcs"].indexOf(isrc) != -1) {
+  if (track.recording.isrcs.indexOf(isrc) != -1) {
     checks.push({type: "info", message: "This ISRC is already attached to this track (it will be skipped)"});
     invalid = true;
   // Check for duplicate ISRCs
   } else if (isrcHistory[isrc]) {
-    checks.push({type: "warning", message: "This ISRC is repeated from another track"});
+    checks.push({type: "warning", message: `This ISRC is repeated from ${isrcHistory[isrc].medium} track ${isrcHistory[isrc].track}`});
   }
-  isrcHistory[isrc] = true;
-
+  isrcHistory[isrc] = {medium: `${medium.format ?? "Medium"} ${medium.position}`, track: track.number};
 
   return {isrc: isrc, invalid: invalid, checks: checks};
 }
@@ -565,7 +579,14 @@ function doCheckIsrcs(event) {
   submitBtn.disabled = true;
 
   let form = document.getElementById("check-isrcs");
-  let params = new URLSearchParams(new FormData(form));
+  let formData = new FormData(form);
+  let params = new URLSearchParams();
+  for (const [key, value] of formData.entries()) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
   pushState(params);
 }
 
@@ -612,17 +633,20 @@ function postISRCs() {
 function buildISRCXML() {
   // Invert the isrcs structure to be a map of isrcs per mbid
   let recordingISRCMap = {};
-  for (let i = 0; i < isrcs.length; i++) {
-    for (let j = 0; j < isrcs[i].length; j++) {
-      let isrc = isrcs[i][j];
-      if (!isrc["isrc"] || isrc["invalid"]) {
-        continue;
-      }
-      let mbid = currentRelease["media"][i]["tracks"][j]["recording"]["id"];
-      if (!recordingISRCMap[mbid]) {
-        recordingISRCMap[mbid] = [];
-      }
-      recordingISRCMap[mbid].push(isrc["isrc"]);
+  for (const [i, isrc] of pregapISRCs.entries()) {
+    if (!isrc.isrc || isrc.invalid) { continue; }
+
+    const mbid = currentRelease.media[i].pregap.recording.id;
+    if (!recordingISRCMap[mbid]) { recordingISRCMap[mbid] = []; }
+    recordingISRCMap[mbid].push(isrc.isrc);
+  }
+  for (const [i, isrcMedium] of isrcs.entries()) {
+    for (const [j, isrc] of isrcMedium.entries()) {
+      if (!isrc.isrc || isrc.invalid) { continue; }
+
+      const mbid = currentRelease.media[i].tracks[j].recording.id;
+      if (!recordingISRCMap[mbid]) { recordingISRCMap[mbid] = []; }
+      recordingISRCMap[mbid].push(isrc.isrc);
     }
   }
 
@@ -706,12 +730,14 @@ function getNextISRCInput(input) {
   let track = +input.dataset.track;
 
   track += 1;
-  while (medium < isrcs.length && track >= isrcs[medium].length) {
+  while (medium <= isrcs.length) {
+    if (track <= isrcs[medium - 1].length) { break; }
+
     medium += 1;
-    track = 0;
+    track = pregapISRCs[medium - 1] ? 0 : 1;
   }
 
-  return document.getElementById(`isrc${medium + 1}-${track + 1}`);
+  return document.getElementById(`isrc${medium}-${track}`);
 }
 
 function getPrevISRCInput(input) {
@@ -720,17 +746,19 @@ function getPrevISRCInput(input) {
     medium = +input.dataset.medium;
     track = +input.dataset.track;
   } else {
-    medium = isrcs.length - 1;
-    track = isrcs[medium].length;
+    medium = isrcs.length;
+    track = isrcs[medium - 1].length + 1;
   }
 
   track -= 1;
-  while (medium > 0 && track < 0) {
+  while (medium > 1) {
+    if (track > 0 || (track == 0 && pregapISRCs[medium - 1])) { break; }
+
     medium -= 1;
-    track = isrcs[medium].length - 1;
+    track = isrcs[medium - 1].length;
   }
 
-  return document.getElementById(`isrc${medium + 1}-${track + 1}`);
+  return document.getElementById(`isrc${medium}-${track}`);
 }
 
 function renderIndex(params) {
@@ -865,34 +893,13 @@ function restoreScrollPosition() {
           </tr>
         </thead>
         <tbody class="d-block">
+          <% if (medium.pregap) { %>
+            <%= tmpl("template_track", {medium: medium, track: medium.pregap, isrc: pregapISRCs[i]}) %>
+          <% } %>
           <% for (var j = 0; j < medium["tracks"].length; j++) { %>
             <% var track = medium["tracks"][j]; %>
             <% var isrc = isrcs[i][j]; %>
-            <tr class="row py-2 border-top">
-              <th scope="row" class="col-1"><%= escapeHtml(track["number"]) %></th>
-              <td class="col-11 col-sm-6 col-md-7 col-lg-8 order-sm-2">
-                <div class="row">
-                  <div class="col-lg-7"><a class="text-decoration-none" href="<%= new URL("recording/" + track["recording"]["id"], mb_site) %>"><%= escapeHtml(track["title"]) %></a></div>
-                  <div class="col-lg-5"><span class="d-lg-none"><span class="text-muted">~</span> Track by </span><%= tmpl("template_ac", {ac: track["artist-credit"]}) %></div>
-                </div>
-              </td>
-              <td class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">
-                <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
-                  <% for (var k = 0; k < track["recording"]["isrcs"].length; k++) { %>
-                    <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
-                  <% } %>
-                </ul>
-                <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" data-isrc data-medium="<%= i %>" data-track="<%= j %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
-                <% if (isrc["checks"].length > 0) { %>
-                  <ul class="list-unstyled m-0">
-                    <% for (let c = 0; c < isrc["checks"].length; c++) { %>
-                      <% var check = isrc["checks"][c]; %>
-                      <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
-                    <% } %>
-                  </ul>
-                <% } %>
-              </td>
-            </tr>
+            <%= tmpl("template_track", {medium: medium, track: track, isrc: isrc}) %>
           <% } %>
         </tbody>
       </table>
@@ -914,12 +921,11 @@ function restoreScrollPosition() {
       <div class="col-12 col-sm-10 col-lg-9">
         <ul class="list-unstyled">
         <% for (let i = 0; i < isrcs.length; i++) { %>
+          <% if (pregapISRCs[i]) { %>
+            <%= tmpl("template_track_preview", {isrc: pregapISRCs[i], recording: release.media[i].pregap.recording}) %>
+          <% } %>
           <% for (let j = 0; j < isrcs[i].length; j++) { %>
-            <% let isrc = isrcs[i][j]; %>
-            <% let recording = release["media"][i]["tracks"][j]["recording"]; %>
-            <% if (isrc["isrc"] && !isrc["invalid"]) { %>
-              <li>ISRC <samp><a class="text-decoration-none" href="<%= new URL("isrc/" + isrc["isrc"], mb_site) %>"><%= escapeHtml(isrc["isrc"]) %></a></samp> to <a class="text-decoration-none" href="<%= new URL("recording/" + recording["id"], mb_site) %>"><bdi><%= escapeHtml(recording["title"]) %></bdi></a> by <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %></li>
-            <% } %>
+            <%= tmpl("template_track_preview", {isrc: isrcs[i][j], recording: release.media[i].tracks[j].recording}) %>
           <% } %>
         <% } %>
         </ul>
@@ -936,6 +942,56 @@ function restoreScrollPosition() {
     </div>
   <% } %>
 </form>
+</script>
+<script type="text/x-ejs" id="template_track">
+  <tr class="row py-2 border-top">
+    <th scope="row" class="col-1"><%= escapeHtml(track.number) %></th>
+    <td class="col-11 col-sm-6 col-md-7 col-lg-8 order-sm-2">
+      <div class="row">
+        <div class="col-lg-7">
+          <a class="text-decoration-none" href="<%= escapeHtml(new URL("recording/" + track.recording.id, mb_site)) %>">
+            <bdi><%= escapeHtml(track.title) %></bdi>
+          </a>
+        </div>
+        <div class="col-lg-5">
+          <span class="d-lg-none"><span class="text-muted">~</span> Track by </span>
+          <%= tmpl("template_ac", {ac: track["artist-credit"]}) %>
+        </div>
+      </div>
+    </td>
+    <td class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">
+      <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
+        <% for (const isrc of track.recording.isrcs) { %>
+          <li><samp><%= escapeHtml(isrc) %></samp></li>
+        <% } %>
+      </ul>
+      <samp><input
+        name="isrc<%= medium.position %>-<%= track.position %>"
+        id="isrc<%= medium.position %>-<%= track.position %>"
+        data-isrc data-medium="<%= medium.position %>" data-track="<%= track.position %>"
+        class="form-control my-2" type="text"
+        value="<%= escapeHtml(isrc.isrc ? isrc.isrc : "") %>"></samp>
+      <% if (isrc["checks"].length > 0) { %>
+        <ul class="list-unstyled m-0">
+          <% for (const check of isrc["checks"]) { %>
+            <li class="text-<%= check["type"] %>"><%= escapeHtml(check["message"]) %></li>
+          <% } %>
+        </ul>
+      <% } %>
+    </td>
+  </tr>
+</script>
+<script type="text/x-ejs" id="template_track_preview">
+  <% if (isrc.isrc && !isrc.invalid) { %>
+    <li>
+      ISRC
+      <samp><a class="text-decoration-none" href="<%= escapeHtml(new URL(`isrc/${isrc.isrc}`, mb_site)) %>"><%= escapeHtml(isrc.isrc) %></a></samp>
+      to
+      <a class="text-decoration-none" href="<%= escapeHtml(new URL(`recording/${recording.id}`, mb_site)) %>"><bdi><%= escapeHtml(recording.title) %></bdi></a>
+      by
+      <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %>
+    </li>
+  <% } %>
 </script>
 <script type="text/x-ejs" id="template_login_progress">
 <h1 class="h3">Logging you in…</h1>
