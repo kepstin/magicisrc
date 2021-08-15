@@ -19,8 +19,46 @@
   font-size: 14px;
   --bs-font-sans-serif: Inter, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
   --bs-font-monospace: Inconsolata, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Source Code Pro", "Liberation Mono", monospace;
+  --bs-blue: #2A7BDE;
+  --bs-red: #C01C28;
+  --bs-yellow: #A2734C;
+  --bs-cyan: #2AA1B3;
+  --bs-gray: #5E5C64;
+  --bs-primary: #2A7BDE;
+  --bs-secondary: #5E5C64;
+  --bs-info: #2AA1B3;
+  --bs-warning: #A2734C;
+  --bs-danger: #C01C28;
+  --bs-body-rgb: 0, 0, 0;
+  --bs-primary-rgb: 42, 123, 222;
+  --bs-secondary-rgb: 94, 92, 100;
+  --bs-info-rgb: 42, 161, 179;
+  --bs-warning-rgb: 162, 115, 76;
+  --bs-danger-rgb: 192, 28, 40;
+  --bs-body-color: #000;
+}
+
+a {
+  color: var(--bs-blue);
+}
+
+a:hover {
+  color: #12488B;
 }
 
 samp, samp .form-control {
   font-weight: 500;
+}
+
+.btn-primary {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+.btn-primary:focus, .btn-primary:hover {
+  background-color: #12488B;
+  border-color: #12488B;
+}
+
+.form-control, .form-control:focus {
+  color: var(--bs-body-color);
 }
