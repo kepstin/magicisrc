@@ -841,7 +841,7 @@ function restoreScrollPosition() {
       <button id="index-mbid-submit" type="submit" class="btn btn-lg btn-primary">Load</button>
     </div>
   </div>
-  <small class="text-muted">
+  <small class="text-secondary">
     You can also paste in a URL to a release page, or any string containing a release MBID.
   </small>
 </form>
@@ -868,9 +868,9 @@ function restoreScrollPosition() {
 <script type="text/x-ejs" id="template_release">
 <h1 class="h3">
   <a class="text-decoration-none" href="<%= new URL("release/" + release["id"], mb_site) %>"><bdi><%= escapeHtml(release["title"]) %></bdi></a>
-  <% if (release["disambiguation"]) { %><small class="text-muted fs-6 fw-normal">(<bdi><%= escapeHtml(release["disambiguation"]) %></bid>)</small><% } %>
+  <% if (release["disambiguation"]) { %><small class="text-secondary fs-6 fw-normal">(<bdi><%= escapeHtml(release["disambiguation"]) %></bid>)</small><% } %>
 </h1>
-<p class="mb-4"><span class="text-muted">~</span> Release by <%= tmpl("template_ac", {ac: release["artist-credit"]}) %></p>
+<p class="mb-4"><span class="text-secondary">~</span> Release by <%= tmpl("template_ac", {ac: release["artist-credit"]}) %></p>
 <form id="check-isrcs" method="get">
   <input type="hidden" name="mbid" value="<%= release["id"] %>">
   <% for (var i = 0; i < release["media"].length; i++) { %>
@@ -904,7 +904,7 @@ function restoreScrollPosition() {
         </tbody>
       </table>
     <% } else { %>
-      <p class="text-muted">(no tracks)</p>
+      <p class="text-secondary">(no tracks)</p>
     <% } %>
   <% } %>
   <div class="row">
@@ -954,13 +954,13 @@ function restoreScrollPosition() {
           </a>
         </div>
         <div class="col-lg-5">
-          <span class="d-lg-none"><span class="text-muted">~</span> Track by </span>
+          <span class="d-lg-none"><span class="text-secondary">~</span> Track by </span>
           <%= tmpl("template_ac", {ac: track["artist-credit"]}) %>
         </div>
       </div>
     </td>
     <td class="col-11 offset-1 col-sm-5 col-md-4 col-lg-3 order-sm-1 offset-sm-0">
-      <ul class="list-unstyled my-0 text-muted" style="padding: 0 calc(0.75rem + 1px);">
+      <ul class="list-unstyled my-0 text-secondary" style="padding: 0 calc(0.75rem + 1px);">
         <% for (const isrc of track.recording.isrcs) { %>
           <li><samp><%= escapeHtml(isrc) %></samp></li>
         <% } %>
@@ -1025,7 +1025,7 @@ function restoreScrollPosition() {
   <h1 class="h3">kepstin’s MagicISRC</h1>
   <p>If you’re seeing this, you either have Javascript disabled, or I’ve gone and broken the page.</p>
 </div>
-<footer class="text-muted my-3">
+<footer class="text-secondary my-3">
   <div class="container">
     <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>. Read the <a href="privacy.html">Privacy Policy</a>.</p>
   </div>
