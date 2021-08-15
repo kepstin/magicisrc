@@ -52,22 +52,22 @@ var poppedState = null;
 // John Resig - http://ejohn.org/ - MIT Licensed
 (function(self){
   var cache = {};
- 
+
   self.tmpl = function tmpl(str, data){
     // Figure out if we're getting a template, or if we need to
     // load the template - and be sure to cache the result.
     var fn = !/\W/.test(str) ?
       cache[str] = cache[str] ||
         tmpl(document.getElementById(str).innerHTML) :
-     
+
       // Generate a reusable function that will serve as a template
       // generator (and which will be cached).
       new Function("obj",
         "var p=[],print=function(){p.push.apply(p,arguments);};" +
-       
+
         // Introduce the data as local variables using with(){}
         "with(obj){p.push('" +
-       
+
         // Convert the template into pure JavaScript
         str
           .replace(/[\r\t\n]/g, " ")
@@ -78,7 +78,7 @@ var poppedState = null;
           .split("%>").join("p.push('")
           .split("\r").join("\\'")
       + "');}return p.join('');");
-   
+
     // Provide some basic currying to the user
     return data ? fn( data ) : fn;
   };
@@ -233,7 +233,7 @@ function parseMbid(str) {
 function checkISRCs(release, params) {
   isrcs = [];
   anyISRCsValid = false;
-  
+
   let isrcHistory = {};
   // Initialize ISRC history with existing ISRCs on the release
   for (let i = 0; i < release["media"].length; i++) {
@@ -558,7 +558,9 @@ function doSubmitMbid() {
   pushState(params);
 }
 
-function doCheckIsrcs() {
+function doCheckIsrcs(event) {
+  event.preventDefault();
+
   let submitBtn = document.getElementById("check-isrcs-submit");
   submitBtn.disabled = true;
 
@@ -661,6 +663,76 @@ function handleSubmit(params) {
   restoreScrollPosition();
 }
 
+function handleISRCKeydown(event) {
+  let code = event.code;
+  let input = event.target;
+  if (event.code == "Enter" || event.code == "NumpadEnter" || code == "ArrowDown") {
+    input = getNextISRCInput(input);
+    if (input) {
+      event.preventDefault();
+      input.focus();
+      input.select();
+      return;
+    }
+    let submit = document.getElementById("check-isrcs-submit");
+    event.preventDefault();
+    submit.focus();
+  } else if (event.code == "ArrowUp") {
+    input = getPrevISRCInput(input);
+    if (input) {
+      event.preventDefault();
+      input.focus();
+      input.select();
+      return;
+    }
+  }
+}
+
+function handleCheckISRCKeydown(event) {
+  let code = event.code;
+  if (event.code == "ArrowUp") {
+    let input = getPrevISRCInput(null);
+    if (input) {
+      event.preventDefault();
+      input.focus();
+      input.select();
+      return;
+    }
+  }
+}
+
+function getNextISRCInput(input) {
+  let medium = +input.dataset.medium;
+  let track = +input.dataset.track;
+
+  track += 1;
+  while (medium < isrcs.length && track >= isrcs[medium].length) {
+    medium += 1;
+    track = 0;
+  }
+
+  return document.getElementById(`isrc${medium + 1}-${track + 1}`);
+}
+
+function getPrevISRCInput(input) {
+  let medium, track;
+  if (input) {
+    medium = +input.dataset.medium;
+    track = +input.dataset.track;
+  } else {
+    medium = isrcs.length - 1;
+    track = isrcs[medium].length;
+  }
+
+  track -= 1;
+  while (medium > 0 && track < 0) {
+    medium -= 1;
+    track = isrcs[medium].length - 1;
+  }
+
+  return document.getElementById(`isrc${medium + 1}-${track + 1}`);
+}
+
 function renderIndex(params) {
   var container = document.getElementById("container");
   container.innerHTML = tmpl("template_index", {
@@ -700,6 +772,11 @@ function renderRelease(release) {
   container.innerHTML = tmpl("template_release", {
     release: release
   });
+  document.getElementById("check-isrcs").onsubmit = doCheckIsrcs;
+  document.getElementById("check-isrcs-submit").onkeydown = handleCheckISRCKeydown;
+  document.querySelectorAll("[data-isrc]").forEach(el => {
+    el.onkeydown = handleISRCKeydown;
+  })
   restoreScrollPosition();
 }
 
@@ -766,12 +843,12 @@ function restoreScrollPosition() {
   <% if (release["disambiguation"]) { %><small class="text-muted fs-6 fw-normal">(<bdi><%= escapeHtml(release["disambiguation"]) %></bid>)</small><% } %>
 </h1>
 <p class="mb-4"><span class="text-muted">~</span> Release by <%= tmpl("template_ac", {ac: release["artist-credit"]}) %></p>
-<form id="check-isrcs" method="get" onsubmit="doCheckIsrcs(); return false;">
+<form id="check-isrcs" method="get">
   <input type="hidden" name="mbid" value="<%= release["id"] %>">
   <% for (var i = 0; i < release["media"].length; i++) { %>
     <% var medium = release["media"][i]; %>
     <h2 class="h4">
-      <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><%= medium["title"] ? ": " + escapeHtml(medium["title"]) : "" %>
+      <%= medium["format"] ? escapeHtml(medium["format"]) : "Medium" %> <%= escapeHtml(medium["position"]) %><% if (medium["title"]) { %>: <bdi><%= escapeHtml(medium["title"]) %></bdi><% } %>
     </h2>
     <% if (medium["tracks"].length > 0) { %>
       <table class="d-block mb-3">
@@ -805,7 +882,7 @@ function restoreScrollPosition() {
                     <li><samp><%= escapeHtml(track["recording"]["isrcs"][k]) %></samp></li>
                   <% } %>
                 </ul>
-                <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
+                <samp><input name="isrc<%= i + 1 %>-<%= j + 1 %>" id="isrc<%= i + 1 %>-<%= j + 1 %>" data-isrc data-medium="<%= i %>" data-track="<%= j %>" class="form-control my-2" type="text" value="<%= isrc["isrc"] ? isrc["isrc"] : "" %>"></samp>
                 <% if (isrc["checks"].length > 0) { %>
                   <ul class="list-unstyled m-0">
                     <% for (let c = 0; c < isrc["checks"].length; c++) { %>
