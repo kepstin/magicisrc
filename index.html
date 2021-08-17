@@ -640,7 +640,7 @@ function buildISRCXML() {
   // Invert the isrcs structure to be a map of isrcs per mbid
   let recordingISRCMap = {};
   for (const [i, isrc] of pregapISRCs.entries()) {
-    if (!isrc.isrc || isrc.invalid) { continue; }
+    if (!isrc || !isrc.isrc || isrc.invalid) { continue; }
 
     const mbid = currentRelease.media[i].pregap.recording.id;
     if (!recordingISRCMap[mbid]) { recordingISRCMap[mbid] = []; }
