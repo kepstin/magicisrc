@@ -53,6 +53,10 @@ samp, samp .form-control {
   font-weight: 500;
 }
 
+code {
+  color: #c64600;
+}
+
 .btn-primary {
   background-color: var(--bs-primary);
   border-color: var(--bs-primary);

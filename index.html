@@ -878,14 +878,24 @@ function restoreScrollPosition() {
 <% } %>
 </script>
 <script type="text/x-ejs" id="template_navbar">
-<a class="navbar-brand me-auto" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
+<a class="navbar-brand" href="<%= escapeHtml(rootLocation) %>" onclick="pushState(&quot;&quot;); return false;">kepstin’s MagicISRC</a>
+<div class="show navbar-collapse me-auto">
+  <ul class="navbar-nav">
+    <li class="nav-item">
+      <a class="nav-link" href="seeding.html">Seeding and Importing</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="privacy.html">Privacy Policy</a>
+    </li>
+  </ul>
+</div>
 <% if (login.userInfo) { %>
   <span class="navbar-text me-3"><%= escapeHtml(login.userInfo.sub) %></span>
-  <form class="form-inline">
+  <form class="d-flex">
     <button class="btn btn-outline-light" type="button" onClick="doLogout(); return false;">Logout</button>
   </form>
 <% } else { %>
-  <form class="form-inline">
+  <form class="d-flex">
     <button class="btn btn-outline-light" type="button" onClick="doLogin(); return false;">Login</button>
   </form>
 <% } %>
@@ -1037,7 +1047,7 @@ function restoreScrollPosition() {
 </script>
   </head>
   <body>
-<nav class="navbar navbar-dark bg-secondary mb-3">
+<nav class="navbar navbar-dark navbar-expand-sm bg-secondary mb-3">
   <div class="container" id="navbar">
     <span class="navbar-brand mr-auto">MagicISRC</span>
   </div>
@@ -1053,7 +1063,7 @@ function restoreScrollPosition() {
 </div>
 <footer class="text-secondary my-3">
   <div class="container">
-    <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>. Read the <a href="privacy.html">Privacy Policy</a>.</p>
+    <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>.</p>
   </div>
 </footer>
 <script type="text/javascript">
