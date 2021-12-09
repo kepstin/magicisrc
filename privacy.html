@@ -15,16 +15,33 @@
 </nav>
 <div class="container">
   <h1>Privacy Policy</h1>
-  <p>The goal of this application is to allow batch-submission of ISRCs to MusicBrainz while storing the minimum amount possible of personally identifiable data. No data is sent to any third parties other than MusicBrainz, and only necessary persistent data is stored in your browser as a result of choosing to log in. Note that your login to MusicBrainz and ISRC submissions are subject to the <a href="https://metabrainz.org/privacy">MetaBrainz Privacy Policy</a>.</p>
+  <p>The goal of this application is to allow batch-submission of ISRCs to MusicBrainz while storing the minimum amount possible of personally identifiable data. No data is sent to any third parties other than MusicBrainz, and persistent data is stored in your browser only as a result of choosing to log in. Note that your login to MusicBrainz and requests to load release information or submit ISRCs are subject to the <a href="https://metabrainz.org/privacy">MetaBrainz Privacy Policy</a>.</p>
   <h2>Web browser local storage</h2>
-  <p>The following data is used by MagicISRC but is stored only in your web browser local storage. This data is never sent to the server hosting MagicISRC or to any third parties other than MusicBrainz:</p>
+  <p>The following personal data is used by MagicISRC but is stored only in your web browser local storage. This data is never sent to the server hosting MagicISRC or to any third parties other than MusicBrainz:</p>
   <ul>
-    <li><b>MusicBrainz login information</b>. This includes your username, an access token for making API requests to submit ISRCs on your behalf, and any personal information on your MusicBrainz user profile that you have made visible to the public.</li>
+    <li><b>MusicBrainz login information.</b> This includes your username, an <b>access token</b> for making API requests to submit ISRCs on your behalf, and any personal information on your MusicBrainz user profile that you have made visible to the public.</li>
+    <li><b>Code verifier.</b> As part of the login process, a secret verification code is used to prevent your login credentials from being intercepted.</p>
+  </ul>
+  <h2>Data sent to MusicBrainz</h2>
+  <p>When you load a release, log in, or submit ISRCs, some data is sent to MusicBrainz. Please read the <a href="https://metabrainz.org/privacy">MetaBrainz Privacy Policy</a> for details about what they do with this data. The following data may be sent to MusicBrainz:</p>
+  <ul>
+    <li><b>IP address &amp; Browser “User-Agent” String.</b></li>
+    <li><b>The fact that you are using the MagicISRC tool.</b> MusicBrainz requires that third-party applications using the API identify themselves for rate limiting and abuse handling reasons. The name of the ISRC submission tool is also shown on the ISRC addition edits that are created (<a href="https://musicbrainz.org/edit/65577123">see an example</a>).</li>
+    <li><b>MusicBrainz access token.</b> (when submitting ISRCs)</li>
+    <li><b>Code verifier.</b> (when logging in)</li>
+    <li><b>Release MBID.</b> (when loading a release)</li>
+    <li><b>Recording MBIDs and ISRCs.</b> (when submitting ISRCs)</li>
   </ul>
   <h2>Web access logs</h2>
-  <p>Like many other web services, I keep logs of all web requests made to this service. These logs are used for diagnostic purposes, and no information from them is sent to any third party or made available publicly. These logs include your IP address, your browser’s “User-Agent” string, and which page you requested. The logs are deleted after 14 days.</p>
-  <p>The data included in these logs may include information about the MusicBrainz release you have selected, and the data that you have filled into the ISRC fields.</p>
-  <p>During the login process, a one-time authorization code generated during the login process is included in these logs. This code cannot be used by itself to gain access to your account – a secret verification value is also required, which is stored only in your web browser local storage.<p>
+  <p>Like many other web services, I keep logs of all web requests made to this service. These logs are used for diagnostic and traffic management purposes, and no information from them is sent to any third party or made available publicly. The logs are deleted after 14 days, although anonymized aggregate traffic data may be preserved indefinitely. The following personal data is logged:</p>
+  <ul>
+    <li><b>IP address &amp; Browser “User-Agent” String.</b></li>
+    <li>
+      <p><b>URL of the loaded page.</b></p>
+      <p>The URL may include the MBID of the selected MusicBrainz Release, and the data that you have filled into the ISRC fields.</p>
+      <p>During the login process, a one-time authorization code is logged as part of the URL. This code cannot be used by itself to gain access to your account – The <b>code verifier</b> (stored only in your browser) is also required.<p>
+    </li>
+  </ul>
 </div>
 <footer class="text-muted my-3">
   <div class="container">
