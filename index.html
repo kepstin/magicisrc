@@ -854,17 +854,13 @@ function restoreScrollPosition() {
 
 </script>
 <script type="text/x-ejs" id="template_index">
-<p>MagicISRC is a tool that makes it easy to submit ISRCs for every track on a <a href="https://musicbrainz.org/">MusicBrainz</a> release.</p>
+<p class="lead">MagicISRC is a tool that makes it easy to submit ISRCs for every track on a <a href="https://musicbrainz.org/">MusicBrainz</a> release.</p>
 <form method="get" onsubmit="doSubmitMbid(); return false;">
   <h1 class="h3"><label for="mbid">Enter a release MBID:</label></h1>
-  <div class="row mb-3">
-    <div class="col">
-      <input type="text" class="form-control form-control-lg<% if (mbidInvalid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
-      <div class="invalid-feedback">The provided value doesn’t contain an MBID</div>
-    </div>
-    <div class="col-auto">
-      <button id="index-mbid-submit" type="submit" class="btn btn-lg btn-primary">Load</button>
-    </div>
+  <div class="input-group has-validation">
+    <input type="text" class="form-control form-control-lg<% if (mbidInvalid) { %> is-invalid <% } %>" id="mbid" value="<%= escapeHtml(mbid) %>">
+    <button id="index-mbid-submit" type="submit" class="btn btn-lg btn-primary">Load</button>
+    <div class="invalid-feedback">The provided value doesn’t contain an MBID</div>
   </div>
   <small class="text-secondary">
     You can also paste in a URL to a release page, or any string containing a release MBID.
