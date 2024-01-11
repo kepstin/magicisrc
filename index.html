@@ -52,6 +52,8 @@ var pregapISRCs = null;
 var anyISRCsValid = false;
 // State from the most recently popped history
 var poppedState = null;
+// edit comment
+var editNote = "";
 
 // Simple JavaScript Templating
 // John Resig - http://ejohn.org/ - MIT Licensed
@@ -90,10 +92,10 @@ var poppedState = null;
 })(window);
 
 (function(self) {
-  var entityMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;', "/": '&#x2F;' };
+  var entityMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;', "/": '&#x2F;' , "\n": '<br>' };
 
   self.escapeHtml = function escapeHtml(string) {
-    return String(string).replace(/[&<>"'\/]/g, function (s) {
+    return String(string).replace(/[&<>"'\/\n]/g, function (s) {
       return entityMap[s];
     });
   };
@@ -493,7 +495,14 @@ function fetchUserinfo() {
     });
 }
 
+function getEditNote(params) {
+  if (params.has("edit-note")) {
+    editNote = params.get("edit-note");
+  }
+}
+
 function handleRelease(params) {
+  getEditNote(params);
   renderReleaseProgress();
   fetchRelease(mbid)
     .then(release => {
@@ -952,6 +961,10 @@ function restoreScrollPosition() {
       <p class="text-secondary">(no tracks)</p>
     <% } %>
   <% } %>
+  <div class="row mb-3">
+    <label for="edit_note-txt" googl="true" style="padding: 0;"><strong>Edit note:</strong></label>
+    <textarea width="50%" rows="8" name="edit-note" id="edit-note-txt" googl="true"><%= escapeHtml(editNote) %></textarea>  
+  </div>
   <div class="row">
       <div class="col-11 col-sm-5 col-md-4 col-lg-3 offset-sm-1">
         <button id="check-isrcs-submit" type="submit" class="btn btn-primary">Check ISRCs &amp; update edit preview</button>
@@ -974,6 +987,14 @@ function restoreScrollPosition() {
           <% } %>
         <% } %>
         </ul>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-12 col-sm-2 offset-lg-1">
+        <strong>Edit note:</strong>
+      </div>
+      <div class="col-12 col-sm-10 col-lg-9">
+        <%= escapeHtml(editNote) %></div>
       </div>
     </div>
     <div class="row">
