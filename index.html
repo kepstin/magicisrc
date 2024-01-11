@@ -698,7 +698,7 @@ function buildISRCXML() {
   if (editNote != "" && editNote != null) {
     let editnoteTag = doc.createElementNS(xmlns, "edit-note");
     editnoteTag.textContent = editNote;
-    doc.appendChild(editnoteTag);
+    metadata.appendChild(editnoteTag);
   }
   return doc;
 }
@@ -967,7 +967,7 @@ function restoreScrollPosition() {
   <% } %>
   <div class="row mb-3">
     <label for="edit_note-txt" googl="true" style="padding: 0;"><strong>Edit note:</strong></label>
-    <textarea width="50%" rows="8" name="edit-note" id="edit-note-txt" googl="true"><%= escapeHtml(editNote) %></textarea>  
+    <textarea width="50%" rows="8" name="edit-note" id="edit-note-txt" googl="true"><%= editNote %></textarea>  
   </div>
   <div class="row">
       <div class="col-11 col-sm-5 col-md-4 col-lg-3 offset-sm-1">
