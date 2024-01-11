@@ -695,7 +695,11 @@ function buildISRCXML() {
       isrcList.appendChild(isrcEl);
     }
   }
-
+  if (editNote != "" && editNote != null) {
+    let editnoteTag = doc.createElementNS(xmlns, "edit-note");
+    editnoteTag.textContent = editNote;
+    doc.appendChild(editnoteTag);
+  }
   return doc;
 }
 
