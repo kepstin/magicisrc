@@ -92,7 +92,7 @@ var editNote = "";
 })(window);
 
 (function(self) {
-  var entityMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;', "/": '&#x2F;' , "\n": '<br>' };
+  var entityMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;', "/": '&#x2F;' };
 
   self.escapeHtml = function escapeHtml(string) {
     return String(string).replace(/[&<>"'\/\n]/g, function (s) {
@@ -999,9 +999,7 @@ function restoreScrollPosition() {
       <div class="col-12 col-sm-2 offset-lg-1 form-label fw-bold">
         Edit note
       </div>
-      <div class="col-12 col-sm-10 col-lg-9">
-        <%= escapeHtml(editNote) %></div>
-      </div>
+      <div style="white-space: pre-wrap"  class="col-12 col-sm-10 col-lg-9"><%=editNote%></div>
     </div>
     <div class="row">
       <div class="col-12 col-sm-10 col-lg-9 offset-sm-2 offset-lg-3">
