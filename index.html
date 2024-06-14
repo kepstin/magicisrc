@@ -95,7 +95,7 @@ var editNote = "";
   var entityMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;', "/": '&#x2F;' };
 
   self.escapeHtml = function escapeHtml(string) {
-    return String(string).replace(/[&<>"'\/\n]/g, function (s) {
+    return String(string).replace(/[&<>"'\/]/g, function (s) {
       return entityMap[s];
     });
   };
@@ -497,7 +497,7 @@ function fetchUserinfo() {
 
 function getEditNote(params) {
   if (params.has("edit-note")) {
-    editNote = params.get("edit-note");
+    editNote = escapeHtml(params.get("edit-note"));
   }
 }
 
