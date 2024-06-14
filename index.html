@@ -966,7 +966,9 @@ function restoreScrollPosition() {
     <% } %>
   <% } %>
   <div class="row mb-3">
-    <label for="edit_note-txt" googl="true" style="padding: 0;"><strong>Edit note:</strong></label>
+    <label for="edit_note-txt" class="form-label fw-bold">
+      Edit note:
+    </label>
     <textarea width="50%" rows="8" name="edit-note" id="edit-note-txt" googl="true"><%= editNote %></textarea>  
   </div>
   <div class="row">
@@ -977,8 +979,8 @@ function restoreScrollPosition() {
   <% if (anyISRCsValid) { %>
     <h1 class="mt-3 h3">Edit Preview</h1>
     <div class="row">
-      <div class="col-12 col-sm-2 offset-lg-1">
-        <strong>Additions:</strong>
+      <div class="col-12 col-sm-2 offset-lg-1 form-label fw-bold">
+        Additions
       </div>
       <div class="col-12 col-sm-10 col-lg-9">
         <ul class="list-unstyled">
@@ -994,8 +996,8 @@ function restoreScrollPosition() {
       </div>
     </div>
     <div class="row">
-      <div class="col-12 col-sm-2 offset-lg-1">
-        <strong>Edit note:</strong>
+      <div class="col-12 col-sm-2 offset-lg-1 form-label fw-bold">
+        Edit note
       </div>
       <div class="col-12 col-sm-10 col-lg-9">
         <%= escapeHtml(editNote) %></div>
