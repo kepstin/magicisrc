@@ -868,7 +868,7 @@ function restoreScrollPosition() {
 </form>
 </script>
 <script type="text/x-ejs" id="template_submit">
-<p>The ISRCs have been successfully sumitted.</p>
+<p>The ISRCs have been successfully submitted.</p>
 <% if (login.userInfo) { %>
   <p><a href="<%= escapeHtml(mb_site) %>search/edits?order=desc&negation=0&combinator=and&conditions.0.field=editor&conditions.0.operator=%3D&conditions.0.name=<%= escapeHtml(login.userInfo.sub) %>&conditions.0.args.0=<%= escapeHtml(login.userInfo.metabrainz_user_id) %>&conditions.1.field=type&conditions.1.operator=%3D&conditions.1.args=76">View your ISRC submission history.</a></p>
 <% } %>
