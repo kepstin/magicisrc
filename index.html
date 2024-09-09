@@ -207,8 +207,14 @@ function checkLogin() {
 }
 
 function checkMbid(params) {
+  // Check for the "mbid" parameter
   mbid = params.get("mbid");
   mbidInvalid = true;
+
+  if (!mbid || mbid == "") {
+    // "mbid" isn't found. Let's check for the alias
+    mbid = params.get("musicbrainzid");
+  }
 
   if (!mbid || mbid == "") {
     mbid = null;
