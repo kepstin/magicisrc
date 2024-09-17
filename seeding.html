@@ -33,10 +33,11 @@
   <h2 id="documentation">Documentation</h2>
   <p>MagicISRC supports seeding by appending GET parameters to the top-level URL <code>https://magicisrc.kepstin.ca/</code>. This makes it easy to use from a Userscript or terminal application, since you just need to construct a link for the user to open in their web browser. The following parameters are supported.</p>
   <dl class="row">
-    <dt class="col-12"><code>mbid</code></dt>
+    <dt class="col-12"><code>mbid</code><br><code>musicbrainzid</code></dt>
     <dd class="col offset-1">
       <p>The MusicBrainz Release ID.</p>
       <p>If not supplied, then MagicISRC will show the “Enter a release MBID:” form. Any supplied ISRCs will be applied after the user manually enters an MBID. The value of this parameter is not required to be a bare MBID – you can use a full MusicBrainz URL, for example. MagicISRC will search for some text that’s formatted like an MBID within the provided string.</p>
+      <p>Using the parameter name <code>musicbrainzid</code> may be helpful in some circumstances, since the name <code>mbid</code> might be detected by browsers as a tracking parameter and removed from links.</p>
     </dd>
     <dt class="col-12"><code>isrc<u>M</u>-<u>T</u></code></dt>
     <dd class="col offset-1">
