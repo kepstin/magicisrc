@@ -307,14 +307,16 @@ function checkISRCs(release, params) {
   console.log(pregapISRCs, isrcs);
 }
 
-var ccodesUpdated = '2021-05-25'; /* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf Updated May 25 2021 */
+/* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf Updated July 20 2022 */
+/* https://isrc.ifpi.org/downloads/Valid_Characters.pdf June 2024 */
+var ccodesUpdated = '2024-06-07';
 var ccodes = [
   'AL', 'DZ', 'AD', 'AO', 'AI', 'AG', 'AR', 'AM', 'AW', 'AU', 'AT', 'AZ',
   'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BM', 'BO', 'BA', 'BR', 'BP',
-  'BX', 'BC', 'BG', 'BF',
+  'BX', 'BC', 'BK', 'BG', 'BF',
   'CM', 'CA', 'CB', 'KY', 'CL', 'CN', 'TW', 'CO', 'CD', 'CI', 'HR', 'CU', 'CW',
   'CY', 'CZ',
-  'DK', 'DM', 'DO',
+  'DK', 'GL', 'FO', 'DM', 'DO',
   'EC', 'EG', 'SV', 'EE', 'ET',
   'FJ', 'FI', 'FR', 'FX', 'PF',
   'GM', 'GE', 'DE', 'GH', 'GI', 'GR', 'GD', 'GT', 'GG', 'GY',
@@ -331,14 +333,12 @@ var ccodes = [
   'RO', 'RU',
   'KN', 'LC', 'VC', 'SM', 'SA', 'SN', 'RS', 'SC', 'SL', 'SG', 'SX', 'SK',
   'SI', 'SB', 'ZA', 'ZB', 'ES', 'LK', 'SZ', 'SE', 'CH',
-  'TZ', 'TH', 'TO', 'TT', 'TN', 'TR',
-  'UG', 'UA', 'AE', 'GB', 'UK', 'GX', 'US', 'QM', 'QZ', 'UY', 'UZ',
+  'TZ', 'TH', 'TO', 'TT', 'TN', 'TR', 'DG',
+  'UG', 'UA', 'AE', 'GB', 'UK', 'GX', 'US', 'QM', 'QT', 'QZ', 'UY', 'UZ',
   'VU', 'VE', 'VN', 'VG',
   'ZM', 'ZW',
   'TC', /* TuneCore */
-  'CP', /* Reserved for future use */
-  'DG', /* International use, includes Turks and Caicos Islands */
-  'ZZ', /* International use, individual allocations */
+  'CP', 'DG', 'QN', 'ZZ', /* Worldwide IIRA direct allocations */
   'CS', 'YU' /* Historical */
 ];
 
@@ -369,9 +369,6 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   }
   if (ccodes.indexOf(country) === -1) {
     checks.push({type: "danger", message: `${country} is not allocated by the IFPI (last updated ${ccodesUpdated})`});
-  }
-  if (country == 'CP') {
-    checks.push({type: "danger", message: "CP is reserved for future use by IFPI (last updated ${ccodesUpdated})"});
   }
   if (registrant == '000') {
     checks.push({type: "warning", message: `Registrant code “${registrant}” may indicate blank or dummy data`});
@@ -892,7 +889,7 @@ function restoreScrollPosition() {
 <div class="show navbar-collapse me-auto">
   <ul class="navbar-nav">
     <li class="nav-item">
-      <a class="nav-link" href="https://github.com/kepstin/magicisrc/releases/tag/v20240922.0">v20240922.0</a>
+      <a class="nav-link" href="https://github.com/kepstin/magicisrc/releases">Release Notes</a>
     </li>
     <li class="nav-item">
       <a class="nav-link" href="seeding.html">Seeding and Importing</a>
