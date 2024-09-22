@@ -1,0 +1,73 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>kepstin’s MagicISRC Seeding and Importing</title>
+    <link rel="stylesheet" href="bootstrap.css">
+    <link rel="stylesheet" href="fonts.css">
+  </head>
+  <body>
+<nav class="navbar navbar-dark bg-secondary mb-3">
+  <div class="container" id="navbar">
+    <a href="/" class="navbar-brand mr-auto">kepstin’s MagicISRC</a>
+  </div>
+</nav>
+<div class="container">
+  <h1>Seeding and Importing</h1>
+  <p>I encourage people who are building IRSC scanners or importer Userscripts for music store and streaming pages to use MagicISRC as an ISRC submission UI. If you do that, then you don't need to build an OAuth authentication system for the MusicBrainz API, and as a bonus the MagicISRC page includes a built-in edit preview, and detection for common problems like duplicated/shifted ISRCs.</p>
+  <h2 id="links">Tools using MagicISRC for ISRC submission</h2>
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 mb-3">
+    <div class="col">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Apple Music Barcodes/ISRCs</h5>
+	  <p class="card-text">Browser userscript that allows reading barcodes, ISRCs, and other metadata from Apple Music releases.</p>
+          <a href="https://github.com/ToadKing/apple-music-barcode-isrc" class="card-link">Github Repository</a>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Your tool here</h5>
+          <p class="card-text">If you’re using MagicISRC to submit ISRCs to Musicbrainz in your app or userscript, please let me know so I can list it here!</p>
+          <a href="https://github.com/kepstin/magicisrc" class="card-link">Open an issue on Github</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p>Contact me by opening an issue on <a href="https://github.com/kepstin/magicisrc">Github</a> if you find errors in this list, or to request removal from the list.</p>
+  <h2 id="documentation">Documentation</h2>
+  <p>MagicISRC supports seeding by appending GET parameters to the top-level URL <code>https://magicisrc.kepstin.ca/</code>. This makes it easy to use from a Userscript or terminal application, since you just need to construct a link for the user to open in their web browser. The following parameters are supported.</p>
+  <dl class="row">
+    <dt class="col-12"><code>mbid</code><br><code>musicbrainzid</code></dt>
+    <dd class="col offset-1">
+      <p>The MusicBrainz Release ID.</p>
+      <p>If not supplied, then MagicISRC will show the “Enter a release MBID:” form. Any supplied ISRCs will be applied after the user manually enters an MBID. The value of this parameter is not required to be a bare MBID – you can use a full MusicBrainz URL, for example. MagicISRC will search for some text that’s formatted like an MBID within the provided string.</p>
+      <p>Using the parameter name <code>musicbrainzid</code> may be helpful in some circumstances, since the name <code>mbid</code> might be detected by browsers as a tracking parameter and removed from links.</p>
+    </dd>
+    <dt class="col-12"><code>isrc<u>M</u>-<u>T</u></code></dt>
+    <dd class="col offset-1">
+      <p>An ISRC, specified by Medium &amp; Track.</p>
+      <p>If you know both which medium and which track an ISRC is for, this is the recommended parameter format. Within the name of the parameter, <code><u>M</u></code> is replaced with the medium index (counting from 1) and <code><u>T</u></code> is replaced with the track index (counting from 1). CD pregap tracks are also supported, by using <code>0</code> as the track index.</p>
+      <p>Examples:</p>
+      <ul class="list-unstyled">
+        <li><samp>isrc1-1</samp> Track 1 on Medium 1</li>
+      </ul>
+    </dd>
+    <dt class="col-12"><code>isrc<u>N</u></code></dt>
+    <dd class="col offset-1">
+      <p>An ISRC, specified by sequential position.</p>
+      <p>If you just have a list of ISRCs but you do not know how they are split between media, use this format. This parameter format is primarily supported for backwards compatibility with older ISRC submission tools – please use the Medium &amp; Track format instead if possible. Within the name of the parameter, <code><u>N</u></code> is replaced with the position (counting from 1). CD pregap tracks are not supported; they will be skipped in the numbering sequence.</p>
+    </dd>
+  </dl>
+</div>
+<footer class="text-muted my-3">
+  <div class="container">
+    <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>.</p>
+  </div>
+</footer>
+  </body>
+</html>
