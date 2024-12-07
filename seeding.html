@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
   <head>
@@ -9,9 +8,22 @@
     <link rel="stylesheet" href="fonts.css">
   </head>
   <body>
-<nav class="navbar navbar-dark bg-secondary mb-3">
+<nav data-bs-theme="dark" class="navbar navbar-expand-sm bg-secondary mb-3">
   <div class="container" id="navbar">
     <a href="/" class="navbar-brand mr-auto">kepstin’s MagicISRC</a>
+    <div class="show navbar-collapse me-auto">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" href="https://github.com/kepstin/magicisrc/releases">Release Notes</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="seeding.html">Seeding and Importing</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="privacy.html">Privacy Policy</a>
+        </li>
+      </ul>
+    </div>
   </div>
 </nav>
 <div class="container">
@@ -61,6 +73,11 @@
     <dd class="col offset-1">
       <p>An ISRC, specified by sequential position.</p>
       <p>If you just have a list of ISRCs but you do not know how they are split between media, use this format. This parameter format is primarily supported for backwards compatibility with older ISRC submission tools – please use the Medium &amp; Track format instead if possible. Within the name of the parameter, <code><u>N</u></code> is replaced with the position (counting from 1). CD pregap tracks are not supported; they will be skipped in the numbering sequence.</p>
+    </dd>
+    <dt class="col-12"><code>edit-note</code></dt>
+    <dd class="col offset-1">
+      <p>An edit note to include with the ISRC addition edit.</p>
+      <p>See the <a href="https://musicbrainz.org/doc/Edit_Note">MusicBrainz Edit Note documentation</a> for detail on the use and formatting of an edit note, and <a href="https://musicbrainz.org/doc/How_to_Write_Edit_Notes">How to Write Edit Notes</a> for more information on what a good edit note should include.</p>
     </dd>
   </dl>
 </div>
