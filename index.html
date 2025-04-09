@@ -198,7 +198,8 @@ function checkLogin() {
 
   // Ensure that login is always a hash
   if (!login) { login = {} }
-  console.log("login", login);
+
+  //console.log("login", login);
 
   // Clear expired login credentials
   if (login.expires <= new Date().getTime()) {
@@ -1089,6 +1090,7 @@ function restoreScrollPosition() {
   <h1 class="h3">kepstin’s MagicISRC</h1>
   <p>The MagicISRC tool requires that Javascript is enabled. It runs completely in your web browser. For information about privacy and what data is stored and sent, please read the <a href="privacy.html">Privacy Policy</a>.</p>
   <p>It's also possible that I’ve made a mistake in the code, or the page isn’t compatible with your web browser. If you’re sure Javascript is enabled and you still see this page, please file an issue on <a href="https://github.com/kepstin/magicisrc">Github</a>.</p>
+  <p>If you use uBlock Origin to block Javascript, please ensure you clear your browser cache or reload the page while holding Shift after enabling Javascript to work around a caching issue.</p>
 </div>
 <footer class="text-secondary my-3">
   <div class="container">
