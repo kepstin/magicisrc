@@ -7,6 +7,13 @@
     <link rel="stylesheet" href="bootstrap.css">
     <link rel="stylesheet" href="fonts.css">
     <link rel="icon" href="favicon.svg">
+<script type="importmap">
+  {
+    "imports": {
+      "mbFetch": "./js/mbFetch.js"
+    }
+  }
+</script>
 <script type="module">
 // Disable automatic scroll restoration where possible, the app handles it.
 if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
@@ -21,9 +28,10 @@ var mb_oauth_redirect_uri = "https://magicisrc-beta.kepstin.ca/";
 var mb_oauth_client_id = "flI-ayzX2u2pzMWosH27FQ";
 var mb_oauth_client_secret = "sGDt_ttwRSQ7K-hHoZA01A"; // Not so secret after all, are you?
 
-import { MbFetch } from './js/mbFetch.js';
 
-const mbFetch = new MbFetch(mb_ws2_base);
+import { MbFetch } from 'mbFetch';
+
+const mbFetch = new MbFetch(mb_ws2_base, mb_client);
 
 // Internal State
 
@@ -464,6 +472,7 @@ function handleLoginCallback(params) {
     .then(fetchUserinfo)
     .catch(error => { renderError("When fetching OAuth2 userinfo: " + error, error) })
     .then(() => {
+      window.sessionStorage.removeItem('mb_oauth_state');
       // We want to do a full navigation here, so that a reload won't try
       // to fetch the access token again
       window.location = updateLocation(new URLSearchParams(state["params"]));
@@ -504,19 +513,24 @@ function checkEditNote(params) {
   editNote = params.get("edit-note") || "";
 }
 
-function handleRelease(params) {
+async function handleRelease(params) {
   renderReleaseProgress();
   checkEditNote(params);
-  mbFetch.fetchRelease(mbid)
-    .then(release => {
-      checkISRCs(release, params);
-      renderRelease(release);
-    }, error => {
-      renderError("When fetching MusicBrainz release: " + error, error);
-    })
-    .catch(error => {
-      renderError("When displaying MusicBrainz release: " + error, error);
-    });
+
+  let release;
+  try {
+    release = await mbFetch.lookupRelease(mbid);
+  } catch (e) {
+    renderError(`When fetching MusicBrainz release: ${error}`, error);
+    return;
+  }
+
+  try {
+    checkISRCs(release, params);
+    renderRelease(release);
+  } catch (e) {
+    renderError(`When displaying MusicBrainz release: ${error}`, error);
+  }
 }
 
 function resolveOauthResponse(response) {
@@ -527,29 +541,6 @@ function resolveOauthResponse(response) {
   return response.text()
     .then(text => {
       return Promise.reject(new Error(text));
-    });
-}
-
-function resolveWs2ResponseJson(response) {
-  return response.json()
-    .then(body => {
-      if (body["error"]) {
-        return Promise.reject(new Error(body["error"]));
-      }
-      return body;
-    });
-}
-
-function resolveWs2ResponseXml(response) {
-  return response.text()
-    .then(body => {
-      let parser = new DOMParser();
-      let doc = parser.parseFromString(body, "application/xml");
-      let firstChild = doc.firstElementChild;
-      if (firstChild.nodeName == "parseerror" && firstChild.namespaceURI == "http://www.mozilla.org/newlayout/xml/parsererror.xml") {
-        return Promise.reject(new Error(firstChild.textContent));
-      }
-      return doc;
     });
 }
 
@@ -593,102 +584,56 @@ function doCheckIsrcs(event) {
   pushState(params);
 }
 
-function doSubmitISRCs() {
+async function doSubmitISRCs() {
   let editSubmitBtn = document.getElementById("edit-submit");
   editSubmitBtn.disabled = true;
 
   renderSubmitProgress();
 
-  postISRCs()
-    .then(() => {
-      let params = new URLSearchParams(window.location.search);
-      params.set("submit", 1);
-      pushState(params);
-    })
-    .catch(error => {
-      renderError("When submitting ISRCs: " + error, error);
-    });
+  try {
+    const metadata = buildISRCMetadata();
+    const response = await mbFetch.submitISRCs(metadata);
+
+    const params = new URLSearchParams(window.location.search);
+    params.set('submit', '1');
+    pushState(params);
+  } catch (e) {
+    renderError(`When submitting ISRCs: ${error}`, error);
+  }
 }
 window.doSubmitISRCs = doSubmitISRCs;
 
-function postISRCs() {
-  let doc = buildISRCXML();
-  let body = new XMLSerializer().serializeToString(doc);
-  console.log(body);
-
-  // Load data for the requested release
-  var url = new URL("recording/", mb_ws2_base);
-  var params = url.searchParams;
-  params.set("client", mb_client);
-  return window.fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + login["accessToken"],
-        "Content-Type": "application/xml"
-      },
-      body: body
-    })
-    .then(resolveWs2ResponseXml)
-    .then(response => {
-      console.log(response);
-    });
-}
-
-function buildISRCXML() {
+function buildISRCMetadata() {
   // Invert the isrcs structure to be a map of isrcs per mbid
-  let recordingISRCMap = {};
-  for (const [i, isrc] of pregapISRCs.entries()) {
-    if (!isrc || !isrc.isrc || isrc.invalid) { continue; }
+  let recordingMap = new Map();
 
-    const mbid = currentRelease.media[i].pregap.recording.id;
-    if (!recordingISRCMap[mbid]) { recordingISRCMap[mbid] = []; }
-    recordingISRCMap[mbid].push(isrc.isrc);
+  function addToRecordingMap(mbid, isrc) {
+    if (!isrc || !isrc.isrc || isrc.invalid) { return; }
+
+    let recording = recordingMap.get(mbid);
+    if (!recording) {
+      recording = { id: mbid, isrcs: [] };
+      recordingMap.set(mbid, recording);
+    }
+    recording.isrcs.push(isrc.isrc);
+  }
+
+  for (const [i, isrc] of pregapISRCs.entries()) {
+    addToRecordingMap(currentRelease.media[i].pregap.recording.id, isrc);
   }
   for (const [i, isrcMedium] of isrcs.entries()) {
     for (const [j, isrc] of isrcMedium.entries()) {
-      if (!isrc.isrc || isrc.invalid) { continue; }
-
-      const mbid = currentRelease.media[i].tracks[j].recording.id;
-      if (!recordingISRCMap[mbid]) { recordingISRCMap[mbid] = []; }
-      recordingISRCMap[mbid].push(isrc.isrc);
+      addToRecordingMap(currentRelease.media[i].tracks[j].recording.id, isrc);
     }
   }
 
-  // Create the XML document for the edit submission
-  let xmlns = "http://musicbrainz.org/ns/mmd-2.0#";
-  let doc = document.implementation.createDocument(xmlns, "", null);
-
-  let metadata = doc.createElementNS(xmlns, "metadata");
-  doc.appendChild(metadata);
-
-  let recordingList = doc.createElementNS(xmlns, "recording-list");
-  metadata.appendChild(recordingList);
-
-  for (let mbid in recordingISRCMap) {
-    let isrcs = recordingISRCMap[mbid];
-    console.log("mbid", mbid, "isrcs", isrcs);
-    let recording = doc.createElementNS(xmlns, "recording");
-    recording.setAttribute("id", mbid);
-    recordingList.appendChild(recording);
-
-    let isrcList = doc.createElementNS(xmlns, "isrc-list");
-    isrcList.setAttribute("count", isrcs.length);
-    recording.appendChild(isrcList);
-
-    for (let isrc of isrcs) {
-      let isrcEl = doc.createElementNS(xmlns, "isrc");
-      isrcEl.setAttribute("id", isrc);
-      isrcList.appendChild(isrcEl);
-    }
-  }
-
+  const metadata = {
+    recordings: Array.from(recordingMap.values()),
+  };
   if (editNote) {
-    const editNoteEl = doc.createElementNS(xmlns, "edit-note");
-    editNoteEl.textContent = editNote;
-    metadata.appendChild(editNoteEl);
+    metadata.editNote = editNote;
   }
-
-  return doc;
+  return metadata;
 }
 
 function handleSubmit(params) {
@@ -825,7 +770,7 @@ function renderLoginProgress() {
 
 function renderError(message, error) {
   console.log(message);
-  console.log(error);
+  console.error(error);
   document.getElementById("container").innerHTML = tmpl("template_error", {error: message});
   resetScrollPosition();
 }

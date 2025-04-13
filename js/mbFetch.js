@@ -1,38 +1,178 @@
+// @ts-check
+
+/**
+ * @typedef {Object} RateControl
+ * @property {number} delay
+ * @property {number} exponent
+ * @property {number} lastRequest
+ */
+
+/**
+ * @typedef {Object} ISRCSubmissionData
+ * @property {Array<{id: string, isrcs: Array<string>}>} recordings
+ * @property {string} [editNote]
+ */
+
 const requestDelayMinimum = 1000; // ms
 const rateControlStorage = 'mbFetchRateControl';
+/** @type {RateControl} */
 const rateControlDefault = {
   delay: requestDelayMinimum,
   exponent: 0,
   lastRequest: 0,
 };
+const xmlns = 'http://musicbrainz.org/ns/mmd-2.0#';
 
-class MbFetch {
-  #ws2Base;
+/**
+ * @param {Response} response
+ * @returns {boolean}
+ */
+function isRetriableFailure(response) {
+  return (response.status === 429 || response.status >= 500);
+}
 
-  #cachedRelease = {};
+/**
+ * Generate an XML document for submitting ISRCs.
+ *
+ * @param {ISRCSubmissionData} data
+ * @returns {XMLDocument}
+ */
+function generateSubmitISRCsXML(data) {
+  const doc = document.implementation.createDocument(xmlns, null, null);
+  const metadata = doc.createElementNS(null,'metadata');
+  doc.appendChild(metadata);
+  const recordingList = doc.createElementNS(null, 'recording-list');
+  metadata.appendChild(recordingList);
 
-  constructor(ws2Base) {
-    this.#ws2Base = ws2Base;
+  for (const recordingData of data.recordings) {
+    if (!(recordingData.isrcs.length > 0)) { continue; }
+
+    const recording = doc.createElementNS(null, 'recording');
+    recording.setAttribute("id", recordingData.id);
+    recordingList.appendChild(recording);
+    const isrcList = doc.createElementNS(null, 'isrc-list');
+    isrcList.setAttribute('count', ''+recordingData.isrcs.length);
+    recording.appendChild(isrcList);
+
+    for (const isrcData of recordingData.isrcs) {
+      const isrc = doc.createElementNS(null, 'isrc');
+      isrc.setAttribute('id', isrcData);
+      isrcList.appendChild(isrc);
+    }
   }
 
+  if (data.editNote) {
+    const editNote = doc.createElementNS(null, 'edit-note');
+    editNote.textContent = data.editNote;
+    metadata.appendChild(editNote);
+  }
+
+  return doc;
+}
+
+/**
+ * Parse an XML document from text, handling the strange way that parse errors are reported.
+ *
+ * @param {string} text
+ * @returns {XMLDocument}
+ */
+function parseXMLResponse(text) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'application/xml');
+
+  const firstChild = doc.firstElementChild;
+  if (!firstChild) {
+    throw new Error('XML response has no document element');
+  }
+  if (firstChild.nodeName == 'parseerror' && firstChild.namespaceURI == 'http://www.mozilla.org/newlayout/xml/parsererror.xml') {
+    throw new Error(`${firstChild.textContent}`);
+  }
+
+  return doc;
+}
+
+class MbFetch {
+  /** @type {string | null} */
+  #accessToken = null;
+  /** @type {string} */
+  #client;
+  /** @type {URL} */
+  #ws2Base;
+
+  /** @type {any} */
+  #cachedRelease = {};
+  /** @type {DOMHighResTimeStamp} */
+  #cachedReleaseTime = 0;
+
+  /**
+   * Create a new MbFetch instance for a given MusicBrainz API url.
+   *
+   * @param {URL} ws2Base
+   * @param {string} client
+   */
+  constructor(ws2Base, client) {
+    this.#ws2Base = ws2Base;
+    this.#client = client;
+  }
+
+  /**
+   * Set or update the accessToken required for authenticated requests.
+   *
+   * @param {string} accessToken
+   */
+  set accessToken(accessToken) {
+    this.#accessToken = accessToken;
+  }
+
+  /**
+   * Fetch current rate control status from local storage, or initialize if not present.
+   *
+   * @returns {RateControl}
+   */
+  #loadRateControl() {
+    const storedRateControl = window.localStorage.getItem(rateControlStorage);
+    if (storedRateControl !== null) {
+      return Object.assign({}, rateControlDefault, JSON.parse(storedRateControl));
+    } else {
+      return Object.assign({}, rateControlDefault);
+    }
+  }
+
+  /**
+   * Save updated rate control to local storage.
+   *
+   * @param {RateControl} rateControl
+   */
+  #storeRateControl(rateControl) {
+    window.localStorage.setItem(rateControlStorage, JSON.stringify(rateControl));
+  }
+
+  /**
+   * Called before making an API request to throttle the request rate.
+   */
   async #delayToNextRequest() {
-    const rateControl = Object.assign({}, rateControlDefault, JSON.parse(window.localStorage.getItem(rateControlStorage)));
+    const rateControl = this.#loadRateControl();
 
     const elapsed = performance.now() - (rateControl.lastRequest - performance.timeOrigin);
     const delay = rateControl.delay - elapsed;
     if (delay > 0) {
       console.log(`MbFetch: last request was ${elapsed} ms ago, waiting ${delay} ms before starting another one`);
-      await new Promise((resolve) => { setTimeout(() => resolve(), delay)});
+      await /** @type {Promise<void>} */ (new Promise((resolve) => { setTimeout(() => resolve(), delay)}));
     } else {
       console.log(`MbFetch: last request was ${elapsed} ms ago, starting another one`);
     }
 
     rateControl.lastRequest = performance.now() + performance.timeOrigin;
-    window.localStorage.setItem(rateControlStorage, JSON.stringify(rateControl));
+    this.#storeRateControl(rateControl);
   }
 
+  /**
+   * Called after making an API request to adjust the time between requests based on the response
+   *
+   * @param {boolean} slowDown
+   */
   #adjustRateControl(slowDown) {
-    const rateControl = Object.assign({}, rateControlDefault, JSON.parse(window.localStorage.getItem(rateControlStorage)));
+    const rateControl = this.#loadRateControl();
 
     if (slowDown) {
       const delay = Math.max(Math.pow(2, rateControl.exponent) * 1000, requestDelayMinimum);
@@ -46,19 +186,27 @@ class MbFetch {
       rateControl.delay = delay;
     }
 
-    window.localStorage.setItem(rateControlStorage, JSON.stringify(rateControl));
+    this.#storeRateControl(rateControl);
   }
 
-  async #fetchInternal(url, retries = 2) {
+  /**
+   * Wrapper function to do rate control waiting and updates around a fetch call, with retries.
+   *
+   * @param {URL | Request} urlOrRequest
+   * @param {number} [retries]
+   * @returns {Promise<Response>}
+   */
+  async #fetchInternal(urlOrRequest, retries = 4) {
     await this.#delayToNextRequest();
 
-    const response = await window.fetch(url);
-    const slowDown = (response.status === 429 || response.status >= 500);
+    const request = new Request(urlOrRequest);
+    const response = await window.fetch(request);
+    const slowDown = isRetriableFailure(response);
     this.#adjustRateControl(slowDown);
 
     if (retries > 0 && slowDown) {
       console.log(`MbFetch: server reported status ${response.status}, ${retries} retries remaining`);
-      return this.#fetchInternal(url, retries - 1);
+      return this.#fetchInternal(urlOrRequest, retries - 1);
     }
 
     if (response.status !== 200) {
@@ -68,33 +216,78 @@ class MbFetch {
     return response;
   }
 
-  async #rateControlledFetch(url) {
+  /**
+   * Wrapper function to make use of the Web Locks api when available to serialize requests between
+   * multiple tabs.
+   *
+   * @param {URL | Request} urlOrRequest
+   * @returns {Promise<Response>}
+   */
+  async #rateControlledFetch(urlOrRequest) {
     if (typeof(navigator.locks) !== "undefined") {
-      return await navigator.locks.request(rateControlStorage, () => { return this.#fetchInternal(url); });
+      return await navigator.locks.request(rateControlStorage, () => { return this.#fetchInternal(urlOrRequest); });
     } else {
-      return await this.#fetchInternal(url);
+      return await this.#fetchInternal(urlOrRequest);
     }
   }
 
-  async fetchRelease(mbid) {
-    if (this.#cachedRelease.id === mbid) {
+  /**
+   * Lookup a release by mbid. Note that the "inc" value is hardcoded for use by MagicISRC.
+   *
+   * @param {string} mbid
+   * @returns {Promise<any>}
+   */
+  async lookupRelease(mbid) {
+    if (this.#cachedRelease.id === mbid && (performance.now() - this.#cachedReleaseTime) < 300_000) {
       return this.#cachedRelease;
     }
 
     const url = new URL("release/" + mbid, this.#ws2Base);
     const params = url.searchParams;
-
     params.set('fmt', 'json');
     params.set('inc', 'artist-credits+isrcs+labels+recordings');
+    const request = new Request(url, { headers: { 'Accept': 'application/json' } });
 
-    const response = await this.#rateControlledFetch(url);
+    const response = await this.#rateControlledFetch(request);
     const body = await response.json();
     if (body['error']) {
       throw new Error(`MusicBrainz release lookup returned error: ${body['error']}`);
     }
 
     this.#cachedRelease = body;
+    this.#cachedReleaseTime = 300;
     return body;
+  }
+
+  /**
+   * Submit ISRCs. An accessToken must be set before making this call.
+   *
+   * @param {ISRCSubmissionData} metadata
+   * @returns {Promise<XMLDocument>}
+   */
+  async submitISRCs(metadata) {
+    if (this.#accessToken === null) {
+      throw new Error('MusicBrainz API accessToken is not set');
+    }
+
+    const url = new URL("recording/", this.#ws2Base);
+    const params = url.searchParams;
+    params.set('client', this.#client);
+    const doc = generateSubmitISRCsXML(metadata);
+    const body = new XMLSerializer().serializeToString(doc);
+    console.log(body);
+    const request = new Request(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.#accessToken}`,
+        'Content-Type': 'application/xml',
+        'Accept': 'application/xml',
+      },
+      body: body,
+    });
+
+    const response = await this.#rateControlledFetch(request);
+    return parseXMLResponse(await response.text());
   }
 }
 
