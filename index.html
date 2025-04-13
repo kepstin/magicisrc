@@ -7,11 +7,11 @@
     <link rel="stylesheet" href="bootstrap.css">
     <link rel="stylesheet" href="fonts.css">
     <link rel="icon" href="favicon.svg">
-<script type="text/javascript">
-"use strict";
-
+<script type="module">
 // Disable automatic scroll restoration where possible, the app handles it.
 if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
+
+import { MbFetch } from './js/mbFetch.js';
 
 // Configuration
 
@@ -22,6 +22,8 @@ var mb_oauth_base = new URL("oauth2/", mb_site);
 var mb_oauth_redirect_uri = "https://magicisrc-beta.kepstin.ca/";
 var mb_oauth_client_id = "flI-ayzX2u2pzMWosH27FQ";
 var mb_oauth_client_secret = "sGDt_ttwRSQ7K-hHoZA01A"; // Not so secret after all, are you?
+
+const mbFetch = new MbFetch(mb_ws2_base);
 
 // Internal State
 
@@ -504,7 +506,7 @@ function checkEditNote(params) {
 function handleRelease(params) {
   renderReleaseProgress();
   checkEditNote(params);
-  fetchRelease(mbid)
+  mbFetch.fetchRelease(mbid)
     .then(release => {
       checkISRCs(release, params);
       renderRelease(release);
@@ -513,26 +515,6 @@ function handleRelease(params) {
     })
     .catch(error => {
       renderError("When displaying MusicBrainz release: " + error, error);
-    });
-}
-
-function fetchRelease(mbid) {
-  // Check if the loaded release is the right one; if so, just use it.
-  if (currentRelease.id == mbid) {
-    return Promise.resolve(currentRelease);
-  }
-
-  // Load data for the requested release
-  var url = new URL("release/" + mbid, mb_ws2_base);
-  var params = url.searchParams;
-  params.set("fmt", "json");
-  params.set("inc", "artist-credits+isrcs+labels+recordings");
-  return window.fetch(url)
-    .then(resolveWs2ResponseJson)
-    .then(response => {
-      console.log(response);
-      currentRelease = response;
-      return response;
     });
 }
 
@@ -589,6 +571,7 @@ function doSubmitMbid() {
   params.set("mbid", newMbid);
   pushState(params);
 }
+window.doSubmitMbid = doSubmitMbid;
 
 function doCheckIsrcs(event) {
   event.preventDefault();
@@ -814,7 +797,8 @@ function getPrevISRCInput(input) {
 function renderIndex(params) {
   var container = document.getElementById("container");
   container.innerHTML = tmpl("template_index", {
-    mbid: params.get("mbid") || ""
+    mbid: mbid || "",
+    mbidInvalid,
   });
   restoreScrollPosition();
 }
@@ -824,7 +808,8 @@ function renderNavbar() {
   var rootLocation = new URL(window.location);
   rootLocation.search = "";
   navbar.innerHTML = tmpl("template_navbar", {
-    rootLocation: rootLocation
+    login,
+    rootLocation,
   });
 }
 
@@ -848,7 +833,13 @@ function renderReleaseProgress() {
 function renderRelease(release) {
   let container = document.getElementById("container");
   container.innerHTML = tmpl("template_release", {
-    release: release
+    anyISRCsValid,
+    editNote,
+    isrcs,
+    login,
+    mb_site,
+    pregapISRCs,
+    release,
   });
   document.getElementById("check-isrcs").onsubmit = doCheckIsrcs;
   document.getElementById("check-isrcs-submit").onkeydown = handleCheckISRCKeydown;
@@ -877,6 +868,8 @@ function restoreScrollPosition() {
     resetScrollPosition();
   }
 }
+
+onPopState();
 
 </script>
 <script type="text/x-ejs" id="template_index">
@@ -930,7 +923,7 @@ function restoreScrollPosition() {
   <a class="text-decoration-none" href="<%= new URL("release/" + release["id"], mb_site) %>"><bdi><%= escapeHtml(release["title"]) %></bdi></a>
   <% if (release["disambiguation"]) { %><small class="text-secondary fs-6 fw-normal">(<bdi><%= escapeHtml(release["disambiguation"]) %></bid>)</small><% } %>
 </h1>
-<p class="mb-4"><span class="text-secondary">~</span> Release by <%= tmpl("template_ac", {ac: release["artist-credit"]}) %></p>
+<p class="mb-4"><span class="text-secondary">~</span> Release by <%= tmpl("template_ac", Object.assign({}, obj, {ac: release["artist-credit"]})) %></p>
 <form id="check-isrcs" method="get">
   <input type="hidden" name="mbid" value="<%= release["id"] %>">
   <% for (var i = 0; i < release["media"].length; i++) { %>
@@ -954,12 +947,12 @@ function restoreScrollPosition() {
         </thead>
         <tbody class="d-block">
           <% if (medium.pregap) { %>
-            <%= tmpl("template_track", {medium: medium, track: medium.pregap, isrc: pregapISRCs[i]}) %>
+            <%= tmpl("template_track", Object.assign({}, obj, {medium: medium, track: medium.pregap, isrc: pregapISRCs[i]})) %>
           <% } %>
           <% for (var j = 0; j < medium["tracks"].length; j++) { %>
             <% var track = medium["tracks"][j]; %>
             <% var isrc = isrcs[i][j]; %>
-            <%= tmpl("template_track", {medium: medium, track: track, isrc: isrc}) %>
+            <%= tmpl("template_track", Object.assign({}, obj, {medium: medium, track: track, isrc: isrc})) %>
           <% } %>
         </tbody>
       </table>
@@ -978,10 +971,10 @@ function restoreScrollPosition() {
         <ul class="list-unstyled">
         <% for (let i = 0; i < isrcs.length; i++) { %>
           <% if (pregapISRCs[i]) { %>
-            <%= tmpl("template_track_preview", {isrc: pregapISRCs[i], recording: release.media[i].pregap.recording}) %>
+            <%= tmpl("template_track_preview", Object.assign({}, obj, {isrc: pregapISRCs[i], recording: release.media[i].pregap.recording})) %>
           <% } %>
           <% for (let j = 0; j < isrcs[i].length; j++) { %>
-            <%= tmpl("template_track_preview", {isrc: isrcs[i][j], recording: release.media[i].tracks[j].recording}) %>
+            <%= tmpl("template_track_preview", Object.assign({}, obj, {isrc: isrcs[i][j], recording: release.media[i].tracks[j].recording})) %>
           <% } %>
         <% } %>
         </ul>
@@ -1011,7 +1004,7 @@ function restoreScrollPosition() {
         </div>
         <div class="col-lg-5">
           <span class="d-lg-none"><span class="text-secondary">~</span> Track by </span>
-          <%= tmpl("template_ac", {ac: track["artist-credit"]}) %>
+          <%= tmpl("template_ac", Object.assign({}, obj, {ac: track["artist-credit"]})) %>
         </div>
       </div>
     </td>
@@ -1046,7 +1039,7 @@ function restoreScrollPosition() {
       to
       <a class="text-decoration-none" href="<%= escapeHtml(new URL(`recording/${recording.id}`, mb_site)) %>"><bdi><%= escapeHtml(recording.title) %></bdi></a>
       by
-      <%= tmpl("template_ac", {ac: recording["artist-credit"]}) %>
+      <%= tmpl("template_ac", Object.assign({}, obj, {ac: recording["artist-credit"]})) %>
     </li>
   <% } %>
 </script>
@@ -1102,9 +1095,5 @@ function restoreScrollPosition() {
     <p>Copyright ©2021 Calvin Walton. Available under the terms of the MIT license. Browse the source on <a href="https://github.com/kepstin/magicisrc">Github</a>.</p>
   </div>
 </footer>
-<script type="text/javascript">
-window.onpopstate = onPopState;
-onPopState();
-</script>
   </body>
 </html>
