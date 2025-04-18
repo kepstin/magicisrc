@@ -550,7 +550,7 @@ async function handleRelease(params) {
 
   try {
     currentRelease = await mbFetch.lookupRelease(mbid);
-  } catch (e) {
+  } catch (error) {
     renderError(`When fetching MusicBrainz release: ${error}`, error);
     return;
   }
@@ -558,7 +558,7 @@ async function handleRelease(params) {
   try {
     checkISRCs(currentRelease, params);
     renderRelease(currentRelease);
-  } catch (e) {
+  } catch (error) {
     renderError(`When displaying MusicBrainz release: ${error}`, error);
   }
 }
