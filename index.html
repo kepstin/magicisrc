@@ -593,12 +593,15 @@ async function doSubmitISRCs() {
     const metadata = buildISRCMetadata();
     mbFetch.accessToken = login.accessToken;
     const response = await mbFetch.submitISRCs(metadata);
-
+  } catch (error) {
+    renderError(`When submitting ISRCs: ${error}`, error);
+  }
+  try {
     const params = new URLSearchParams(window.location.search);
     params.set('submit', '1');
     pushState(params);
   } catch (error) {
-    renderError(`When submitting ISRCs: ${error}`, error);
+    renderError(`When displaying submission result page: ${error}`, error);
   }
 }
 window.doSubmitISRCs = doSubmitISRCs;
@@ -640,6 +643,7 @@ function handleSubmit(params) {
   var container = document.getElementById("container");
   container.innerHTML = tmpl("template_submit", {
     login,
+    mb_site,
   });
   restoreScrollPosition();
 }
