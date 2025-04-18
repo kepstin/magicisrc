@@ -41,28 +41,28 @@ function generateSubmitISRCsXML(data) {
   const doc = document.implementation.createDocument(xmlns, null, null);
   const metadata = doc.createElementNS(xmlns,'metadata');
   doc.appendChild(metadata);
-  const recordingList = doc.createElementNS(null, 'recording-list');
+  const recordingList = doc.createElementNS(xmlns, 'recording-list');
   metadata.appendChild(recordingList);
 
   for (const recordingData of data.recordings) {
     if (!(recordingData.isrcs.length > 0)) { continue; }
 
-    const recording = doc.createElementNS(null, 'recording');
+    const recording = doc.createElementNS(xmlns, 'recording');
     recording.setAttribute("id", recordingData.id);
     recordingList.appendChild(recording);
-    const isrcList = doc.createElementNS(null, 'isrc-list');
+    const isrcList = doc.createElementNS(xmlns, 'isrc-list');
     isrcList.setAttribute('count', ''+recordingData.isrcs.length);
     recording.appendChild(isrcList);
 
     for (const isrcData of recordingData.isrcs) {
-      const isrc = doc.createElementNS(null, 'isrc');
+      const isrc = doc.createElementNS(xmlns, 'isrc');
       isrc.setAttribute('id', isrcData);
       isrcList.appendChild(isrc);
     }
   }
 
   if (data.editNote) {
-    const editNote = doc.createElementNS(null, 'edit-note');
+    const editNote = doc.createElementNS(xmlns, 'edit-note');
     editNote.textContent = data.editNote;
     metadata.appendChild(editNote);
   }
