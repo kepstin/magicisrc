@@ -340,38 +340,48 @@ function checkISRCs(release, params) {
 }
 
 /* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf Updated July 20 2022 */
-/* https://isrc.ifpi.org/downloads/Valid_Characters.pdf June 2024 */
-var ccodesUpdated = '2024-06-07';
+/* https://isrc.ifpi.org/downloads/Valid_Characters.pdf December 2024 */
+var ccodesUpdated = 'December 2024';
 var ccodes = [
-  'AL', 'DZ', 'AD', 'AO', 'AI', 'AG', 'AR', 'AM', 'AW', 'AU', 'AT', 'AZ',
-  'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BM', 'BO', 'BA', 'BR', 'BP',
-  'BX', 'BC', 'BK', 'BG', 'BF',
-  'CM', 'CA', 'CB', 'KY', 'CL', 'CN', 'TW', 'CO', 'CD', 'CI', 'HR', 'CU', 'CW',
-  'CY', 'CZ',
-  'DK', 'GL', 'FO', 'DM', 'DO',
-  'EC', 'EG', 'SV', 'EE', 'ET',
-  'FJ', 'FI', 'FR', 'FX', 'PF',
-  'GM', 'GE', 'DE', 'GH', 'GI', 'GR', 'GD', 'GT', 'GG', 'GY',
-  'HT', 'HN', 'HK', 'HU',
-  'IS', 'IN', 'ID', 'IR', 'IQ', 'IE', 'IL', 'IT',
-  'JM', 'JP', 'JE', 'JO',
-  'KZ', 'KE', 'KR', 'KS', 'XK',
-  'LA', 'LV', 'LB', 'LS', 'LI', 'LT', 'LU',
-  'MO', 'MK', 'MW', 'MY', 'MV', 'MT', 'MU', 'MX', 'MD', 'MC', 'ME', 'MS',
-  'MA', 'MZ',
-  'NA', 'NP', 'NL', 'NZ', 'NG', 'MP', 'NO',
-  'PK', 'PA', 'PG', 'PY', 'PE', 'PH', 'PL', 'PT', 'PR',
-  'QA',
-  'RO', 'RU',
-  'KN', 'LC', 'VC', 'SM', 'SA', 'SN', 'RS', 'SC', 'SL', 'SG', 'SX', 'SK',
-  'SI', 'SB', 'ZA', 'ZB', 'ES', 'LK', 'SZ', 'SE', 'CH',
-  'TZ', 'TH', 'TO', 'TT', 'TN', 'TR', 'DG',
-  'UG', 'UA', 'AE', 'GB', 'UK', 'GX', 'US', 'QM', 'QT', 'QZ', 'UY', 'UZ',
-  'VU', 'VE', 'VN', 'VG',
-  'ZM', 'ZW',
-  'TC', /* TuneCore */
-  'CP', 'DG', 'QN', 'ZZ', /* Worldwide IIRA direct allocations */
-  'CS', 'YU' /* Historical */
+  'AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AR', 'AT', 'AU', 'AW', 'AZ',
+  'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BM',
+  'BN', 'BO', 'BP', 'BR', 'BS', 'BW', 'BX', 'BY', 'BZ',
+  'CA', 'CB', 'CD', 'CF', 'CG', 'CH', 'CI', 'CL', 'CM', 'CN', 'CO',
+  'CP', // Worldwide IIRA direct allocation
+  'CS', // Allocated to producers in former Serbia & Montenegro (prior to 2006)
+  'CU', 'CV', 'CW', 'CY', 'CZ',
+  'DE',
+  'DG', // Turks and Caicos Islands, Worldwide IIRA direct allocation
+  'DK', 'DM', 'DO', 'DZ',
+  'EC', 'EE', 'EG', 'ES', 'ET',
+  'FI', 'FJ', 'FO', 'FR', 'FX',
+  'GA', 'GB', 'GD', 'GE', 'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GQ', 'GR',
+  'GT', 'GW', 'GX', 'GY',
+  'HK', 'HN', 'HR', 'HT', 'HU',
+  'ID', 'IE', 'IL',
+  'IM', // Historically allocated for Isle of Mann. Registrants in Isle of Mann now supported by PPL UK.
+  'IN', 'IQ', 'IR', 'IS', 'IT',
+  'JE', 'JM', 'JO', 'JP',
+  'KE', 'KG', 'KH', 'KM', 'KN', 'KR', 'KS', 'KW', 'KY', 'KZ',
+  'LA', 'LB', 'LC', 'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV',
+  'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MK', 'ML', 'MM', 'MN', 'MO', 'MP',
+  'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ',
+  'NA', 'NE', 'NG', 'NI', 'NL', 'NO', 'NP', 'NZ',
+  'OM',
+  'PA', 'PE', 'PF', 'PG', 'PH', 'PK', 'PL', 'PR', 'PS', 'PT', 'PY',
+  'QA', 'QM', 'QN', 'QT', 'QZ',
+  'RO', 'RS', 'RU', 'RW',
+  'SA', 'SB', 'SC', 'SD', 'SE', 'SG', 'SI', 'SK', 'SL', 'SM', 'SN', 'SO',
+  'SR', 'SS', 'SV', 'SX', 'SY', 'SZ',
+  'TC', // TuneCore
+  'TD', 'TG', 'TH', 'TL', 'TN', 'TO', 'TR', 'TT', 'TW', 'TZ',
+  'UA', 'UG', 'UK', 'US', 'UY', 'UZ',
+  'VC', 'VE', 'VG', 'VN', 'VU',
+  'XK',
+  'YE',
+  'YU', // Allocated to producers in former Yugoslavia (prior to 2003)
+  'ZA', 'ZB', 'ZM', 'ZW',
+  'ZZ', // Worldwide IIRA direct allocation
 ];
 
 function checkOneISRC(isrc, medium, track, isrcHistory) {
@@ -405,12 +415,6 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   if (registrant == '000') {
     checks.push({type: "warning", message: `Registrant code “${registrant}” may indicate blank or dummy data`});
   }
-  if (country == 'CS' && (year > 6 && year < 86)) {
-    checks.push({type: "warning", message: "CS is a historical code for Serbia & Montenegro – recordings prior to 2006 only"});
-  }
-  if (country == 'YU' && (year > 3 && year < 86)) {
-    checks.push({type: "warning", message: "YU is a historical code for Yugoslavia – recordings prior to 2003 only"});
-  }
 
   // Add a message if the ISRC was already present
   if (track.recording.isrcs.indexOf(isrc) != -1) {
@@ -422,11 +426,20 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   }
   isrcHistory[isrc] = {medium: `${medium.format ?? "Medium"} ${medium.position}`, track: track.number};
 
+  if (country == 'CS' && (year > 6 && year < 86)) {
+    checks.info({type: "info", message: "Allocated to producers in former Serbia & Montenegro (prior to 2006)"});
+  }
+  if (country == 'IM') {
+    checks.push({type: 'info', message: 'Historically allocated for Isle of Mann. Registrants in Isle of Mann now supported by PPL UK.'});
+  }
   if (country == 'PR') {
-    checks.push({type: "info", message: "PR is a historical allocation for Puerto Rico, new recordings are expected to be US/QM/QZ"});
+    checks.push({type: "info", message: "Historically allocated for Puerto Rico. Registrants in Peurto Rico now supported by RIAA (United States)."});
   }
   if (country == 'TC') {
     checks.push({type: "info", message: "TC is allocated to TuneCore - Turks and Caicos Islands use DG"});
+  }
+  if (country == 'YU' && (year > 3 && year < 86)) {
+    checks.push({type: "info", message: "Allocated to producers in former Yugoslavia (prior to 2003)"});
   }
 
   return {
