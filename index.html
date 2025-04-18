@@ -653,6 +653,7 @@ function buildISRCMetadata() {
   }
 
   for (const [i, isrc] of pregapISRCs.entries()) {
+    if (!currentRelease.media[i].pregap) { continue; }
     addToRecordingMap(currentRelease.media[i].pregap.recording.id, isrc);
   }
   for (const [i, isrcMedium] of isrcs.entries()) {
