@@ -517,17 +517,16 @@ async function handleRelease(params) {
   renderReleaseProgress();
   checkEditNote(params);
 
-  let release;
   try {
-    release = await mbFetch.lookupRelease(mbid);
+    currentRelease = await mbFetch.lookupRelease(mbid);
   } catch (e) {
     renderError(`When fetching MusicBrainz release: ${error}`, error);
     return;
   }
 
   try {
-    checkISRCs(release, params);
-    renderRelease(release);
+    checkISRCs(currentRelease, params);
+    renderRelease(currentRelease);
   } catch (e) {
     renderError(`When displaying MusicBrainz release: ${error}`, error);
   }
