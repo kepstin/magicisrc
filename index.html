@@ -591,6 +591,7 @@ async function doSubmitISRCs() {
 
   try {
     const metadata = buildISRCMetadata();
+    mbFetch.accessToken = login.accessToken;
     const response = await mbFetch.submitISRCs(metadata);
 
     const params = new URLSearchParams(window.location.search);
