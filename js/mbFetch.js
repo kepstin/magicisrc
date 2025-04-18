@@ -39,7 +39,7 @@ function isRetriableFailure(response) {
  */
 function generateSubmitISRCsXML(data) {
   const doc = document.implementation.createDocument(xmlns, null, null);
-  const metadata = doc.createElementNS(null,'metadata');
+  const metadata = doc.createElementNS(xmlns,'metadata');
   doc.appendChild(metadata);
   const recordingList = doc.createElementNS(null, 'recording-list');
   metadata.appendChild(recordingList);
@@ -76,7 +76,7 @@ function generateSubmitISRCsXML(data) {
  * @param {string} text
  * @returns {XMLDocument}
  */
-function parseXMLResponse(text) {
+function parseXMLPostResponse(text) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(text, 'application/xml');
 
@@ -86,6 +86,15 @@ function parseXMLResponse(text) {
   }
   if (firstChild.nodeName == 'parseerror' && firstChild.namespaceURI == 'http://www.mozilla.org/newlayout/xml/parsererror.xml') {
     throw new Error(`${firstChild.textContent}`);
+  }
+
+  const messageResult = doc.evaluate('/metadata/message/text', doc, null, XPathResult.ANY_UNORDERED_NODE_TYPE, null);
+  if (messageResult.singleNodeValue === null) {
+    throw new Error(`XML response has unexpected format`);
+  }
+  const message = messageResult.singleNodeValue.textContent;
+  if (message !== 'OK') {
+    throw new Error(`Request failed with message: ${message}`);
   }
 
   return doc;
@@ -287,7 +296,7 @@ class MbFetch {
     });
 
     const response = await this.#rateControlledFetch(request);
-    return parseXMLResponse(await response.text());
+    return parseXMLPostResponse(await response.text());
   }
 }
 
