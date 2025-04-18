@@ -597,7 +597,7 @@ async function doSubmitISRCs() {
     const params = new URLSearchParams(window.location.search);
     params.set('submit', '1');
     pushState(params);
-  } catch (e) {
+  } catch (error) {
     renderError(`When submitting ISRCs: ${error}`, error);
   }
 }
