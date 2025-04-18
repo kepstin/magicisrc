@@ -626,6 +626,7 @@ async function doSubmitISRCs() {
     const response = await mbFetch.submitISRCs(metadata);
   } catch (error) {
     renderError(`When submitting ISRCs: ${error}`, error);
+    return;
   }
   try {
     const params = new URLSearchParams(window.location.search);
@@ -633,6 +634,7 @@ async function doSubmitISRCs() {
     pushState(params);
   } catch (error) {
     renderError(`When displaying submission result page: ${error}`, error);
+    return;
   }
 }
 window.doSubmitISRCs = doSubmitISRCs;
