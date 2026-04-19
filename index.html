@@ -339,50 +339,235 @@ function checkISRCs(release, params) {
   console.log(pregapISRCs, isrcs);
 }
 
-/* https://isrc.ifpi.org/downloads/ISRC_Bulletin-2015-01.pdf Updated July 20 2022 */
-/* https://isrc.ifpi.org/downloads/Valid_Characters.pdf December 2024 */
-var ccodesUpdated = 'December 2024';
-var ccodes = [
-  'AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AR', 'AT', 'AU', 'AW', 'AZ',
-  'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BM',
-  'BN', 'BO', 'BP', 'BR', 'BS', 'BW', 'BX', 'BY', 'BZ',
-  'CA', 'CB', 'CD', 'CF', 'CG', 'CH', 'CI', 'CL', 'CM', 'CN', 'CO',
-  'CP', // Worldwide IIRA direct allocation
-  'CS', // Allocated to producers in former Serbia & Montenegro (prior to 2006)
-  'CU', 'CV', 'CW', 'CY', 'CZ',
-  'DE',
-  'DG', // Turks and Caicos Islands, Worldwide IIRA direct allocation
-  'DK', 'DM', 'DO', 'DZ',
-  'EC', 'EE', 'EG', 'ES', 'ET',
-  'FI', 'FJ', 'FO', 'FR', 'FX',
-  'GA', 'GB', 'GD', 'GE', 'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GQ', 'GR',
-  'GT', 'GW', 'GX', 'GY',
-  'HK', 'HN', 'HR', 'HT', 'HU',
-  'ID', 'IE', 'IL',
-  'IM', // Historically allocated for Isle of Mann. Registrants in Isle of Mann now supported by PPL UK.
-  'IN', 'IQ', 'IR', 'IS', 'IT',
-  'JE', 'JM', 'JO', 'JP',
-  'KE', 'KG', 'KH', 'KM', 'KN', 'KR', 'KS', 'KW', 'KY', 'KZ',
-  'LA', 'LB', 'LC', 'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV',
-  'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MK', 'ML', 'MM', 'MN', 'MO', 'MP',
-  'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ',
-  'NA', 'NE', 'NG', 'NI', 'NL', 'NO', 'NP', 'NZ',
-  'OM',
-  'PA', 'PE', 'PF', 'PG', 'PH', 'PK', 'PL', 'PR', 'PS', 'PT', 'PY',
-  'QA', 'QM', 'QN', 'QT', 'QZ',
-  'RO', 'RS', 'RU', 'RW',
-  'SA', 'SB', 'SC', 'SD', 'SE', 'SG', 'SI', 'SK', 'SL', 'SM', 'SN', 'SO',
-  'SR', 'SS', 'SV', 'SX', 'SY', 'SZ',
-  'TC', // TuneCore
-  'TD', 'TG', 'TH', 'TL', 'TN', 'TO', 'TR', 'TT', 'TW', 'TZ',
-  'UA', 'UG', 'UK', 'US', 'UY', 'UZ',
-  'VC', 'VE', 'VG', 'VN', 'VU',
-  'XK',
-  'YE',
-  'YU', // Allocated to producers in former Yugoslavia (prior to 2003)
-  'ZA', 'ZB', 'ZM', 'ZW',
-  'ZZ', // Worldwide IIRA direct allocation
-];
+// https://isrc.ifpi.org/images/downloads/Bulletin_2015-01_-_Validating_ISRC_Codes.pdf
+// https://isrc.ifpi.org/images/downloads/Valid_Characters_in_the_ISRC_Prefix.pdf November 2025
+// Note that territory names are taken from the IFPI documentation to assist in collating updates
+var ccodesUpdated = 'November 2025';
+var ccodes = {
+  'AD': { 'territory': 'Andorra' },
+  'AE': { 'territory': 'United Arab Emirates' },
+  'AF': { 'territory': 'Afghanistan', 'allocated': 2024 }, // December 2024
+  'AG': { 'territory': 'Antigua and Barbuda' },
+  'AI': { 'territory': 'Anguilla' },
+  'AL': { 'territory': 'Albania' },
+  'AM': { 'territory': 'Armenia' },
+  'AO': { 'territory': 'Angola' },
+  'AR': { 'territory': 'Argentina' },
+  'AT': { 'territory': 'Austria' },
+  'AU': { 'territory': 'Australia' },
+  'AW': { 'territory': 'Aruba' },
+  'AZ': { 'territory': 'Azerbaijan' },
+  'BA': { 'territory': 'Bosnia and Herzegovina' },
+  'BB': { 'territory': 'Barbados' },
+  'BC': { 'territory': 'Brazil' },
+  'BD': { 'territory': 'Bangladesh' },
+  'BE': { 'territory': 'Belgium' },
+  'BF': { 'territory': 'Burkina Faso' },
+  'BG': { 'territory': 'Bulgaria' },
+  'BH': { 'territory': 'Bahrain' },
+  'BI': { 'territory': 'Burundi', 'allocated': 2024 }, // December 2024
+  'BJ': { 'territory': 'Benin', 'allocated': 2024 }, // December 2024
+  'BK': { 'territory': 'Brazil' },
+  'BM': { 'territory': 'Bermuda' },
+  'BN': { 'territory': 'Brunei Darussalam', 'allocated': 2024 }, // December 2024
+  'BO': { 'territory': 'Bolivia' },
+  'BP': { 'territory': 'Brazil' },
+  'BR': { 'territory': 'Brazil' },
+  'BS': { 'territory': 'Bahamas' },
+  'BT': { 'territory': 'Bhutan', 'allocated': 2025 }, // November 2025
+  'BW': { 'territory': 'Botswana', 'allocated': 2024 }, // December 2024
+  'BX': { 'territory': 'Brazil', 'allocated': 2014 },
+  'BY': { 'territory': 'Belarus' },
+  'BZ': { 'territory': 'Belize' },
+  'CA': { 'territory': 'Canada' },
+  'CB': { 'territory': 'Canada' },
+  'CD': { 'territory': 'Democratic Republic of the Congo' },
+  'CF': { 'territory': 'Central African Republic', 'allocated': 2024 }, // December 2024
+  'CG': { 'territory': 'Congo', 'allocated': 2024 }, // December 2024
+  'CH': { 'territory': 'Switzerland' },
+  'CI': { 'territory': "Cote d'Ivoire" },
+  'CL': { 'territory': 'Chile' },
+  'CM': { 'territory': 'Cameroon' },
+  'CN': { 'territory': 'China' },
+  'CO': { 'territory': 'Colombia' },
+  'CP': { 'territory': 'Worldwide (direct allocation)', 'allocated': 2012 },
+  'CR': { 'territory': 'Costa Rica', 'allocated': 2025 }, // October 2025
+  'CS': { 'territory': 'Former Serbia & Montenegro', 'deallocated': 2006 },
+  'CU': { 'territory': 'Cuba' },
+  'CV': { 'territory': 'Cabo Verde', 'allocated': 2024 }, // December 2024
+  'CW': { 'territory': 'Curacao' },
+  'CY': { 'territory': 'Cyprus' },
+  'CZ': { 'territory': 'Czech Republic' },
+  'DE': { 'territory': 'Germany' },
+  'DG': { 'territory': 'Turks and Caicos Islands, Worldwide (direct allocation)', 'allocated': 2012 },
+  'DK': { 'territory': 'Denmark' },
+  'DM': { 'territory': 'Dominica' },
+  'DO': { 'territory': 'Dominican Republic' },
+  'DZ': { 'territory': 'Algeria' },
+  'EC': { 'territory': 'Ecuador' },
+  'EE': { 'territory': 'Estonia' },
+  'EG': { 'territory': 'Egypt' },
+  'ES': { 'territory': 'Spain' },
+  'ET': { 'territory': 'Ethiopia' },
+  'FI': { 'territory': 'Finland' },
+  'FJ': { 'territory': 'Fiji' },
+  'FO': { 'territory': 'Denmark' },
+  'FR': { 'territory': 'France' },
+  'FX': { 'territory': 'France', 'allocated': 2013 },
+  'GA': { 'territory': 'Gabon', 'allocated': 2024 }, // December 2024
+  'GB': { 'territory': 'United Kingdom' },
+  'GD': { 'territory': 'Grenada' },
+  'GE': { 'territory': 'Georgia' },
+  'GG': { 'territory': 'Guernsey' },
+  'GH': { 'territory': 'Ghana' },
+  'GI': { 'territory': 'Gibraltar' },
+  'GL': { 'territory': 'Denmark' },
+  'GM': { 'territory': 'Gambia' },
+  'GN': { 'territory': 'Guinea', 'allocated': 2024 }, // December 2024
+  'GQ': { 'territory': 'Equatorial Guinea', 'allocated': 2024 }, // December 2024
+  'GR': { 'territory': 'Greece' },
+  'GT': { 'territory': 'Guatemala' },
+  'GW': { 'territory': 'Guina-Bissau', 'allocated': 2024 }, // December 2024
+  'GX': { 'territory': 'United Kingdom' },
+  'GY': { 'territory': 'Guyana' },
+  'HK': { 'territory': 'Hong Kong SAR, China' },
+  'HN': { 'territory': 'Honduras' },
+  'HR': { 'territory': 'Croatia' },
+  'HT': { 'territory': 'Haiti' },
+  'HU': { 'territory': 'Hungary' },
+  'ID': { 'territory': 'Indonesia' },
+  'IE': { 'territory': 'Ireland' },
+  'IL': { 'territory': 'Israel' },
+  'IM': { 'territory': 'Isle of Mann (historical allocations)', 'deallocated': true },
+  'IN': { 'territory': 'India' },
+  'IQ': { 'territory': 'Iraq' },
+  'IR': { 'territory': 'Iran' },
+  'IS': { 'territory': 'Iceland' },
+  'IT': { 'territory': 'Italy' },
+  'JE': { 'territory': 'Jersey' },
+  'JM': { 'territory': 'Jamaica', 'reserved': ['K40'] },
+  'JO': { 'territory': 'Jordan' },
+  'JP': { 'territory': 'Japan' },
+  'KE': { 'territory': 'Kenya' },
+  'KG': { 'territory': 'Krygyzstan', 'allocated': 2024 }, // December 2024
+  'KH': { 'territory': 'Cambodia', 'allocated': 2024 }, // December 2024
+  'KM': { 'territory': 'Comoros', 'allocated': 2024 }, // December 2024
+  'KN': { 'territory': 'Saint Kitts and Nevis' },
+  'KR': { 'territory': 'South Korea' },
+  'KS': { 'territory': 'South Korea' },
+  'KW': { 'territory': 'Kuwait', 'allocated': 2024 }, // December 2024
+  'KY': { 'territory': 'Cayman Islands' },
+  'KZ': { 'territory': 'Kazakhstan' },
+  'LA': { 'territory': 'Lao' },
+  'LB': { 'territory': 'Lebanon' },
+  'LC': { 'territory': 'Saint Lucia' },
+  'LI': { 'territory': 'Liechtenstein' },
+  'LK': { 'territory': 'Sri Lanka' },
+  'LR': { 'territory': 'Liberia', 'allocated': 2024 }, // December 2024
+  'LS': { 'territory': 'Lesotho' },
+  'LT': { 'territory': 'Lithuania' },
+  'LU': { 'territory': 'Luxembourg' },
+  'LV': { 'territory': 'Latvia' },
+  'MA': { 'territory': 'Morocco' },
+  'MC': { 'territory': 'Monaco' },
+  'MD': { 'territory': 'Moldova' },
+  'ME': { 'territory': 'Montenegro' },
+  'MF': { 'territory': 'Saint Martin (French part)', 'allocated': 2024 }, // December 2024
+  'MG': { 'territory': 'Madagascar', 'allocated': 2024 }, // December 2024
+  'MK': { 'territory': 'Macedonia' },
+  'ML': { 'territory': 'Mali', 'allocated': 2024 }, // December 2024
+  'MM': { 'territory': 'Myanmar', 'allocated': 2024 }, // December 2024
+  'MN': { 'territory': 'Mongolia', 'allocated': 2024 }, // December 2024
+  'MO': { 'territory': 'Macao' },
+  'MP': { 'territory': 'Northern Mariana Islands' },
+  'MR': { 'territory': 'Mauritania', 'allocated': 2024 }, // December 2024
+  'MS': { 'territory': 'Montserrat' },
+  'MT': { 'territory': 'Malta' },
+  'MU': { 'territory': 'Mauritius' },
+  'MV': { 'territory': 'Maldives' },
+  'MW': { 'territory': 'Malawi' },
+  'MX': { 'territory': 'Mexico' },
+  'MY': { 'territory': 'Malaysia' },
+  'MZ': { 'territory': 'Mozambique' },
+  'NA': { 'territory': 'Namibia' },
+  'NE': { 'territory': 'Niger', 'allocated': 2024 }, // December 2024
+  'NG': { 'territory': 'Nigeria' },
+  'NI': { 'territory': 'Nicaragua', 'allocated': 2024 }, // December 2024
+  'NL': { 'territory': 'Netherlands' },
+  'NO': { 'territory': 'Norway' },
+  'NP': { 'territory': 'Nepal' },
+  'NZ': { 'territory': 'New Zealand', 'reserved': ['AA0'] },
+  'OM': { 'territory': 'Oman', 'allocated': 2024 }, // December 2024
+  'PA': { 'territory': 'Panama' },
+  'PE': { 'territory': 'Peru' },
+  'PF': { 'territory': 'French Polynesia' },
+  'PG': { 'territory': 'Papua New Guinea' },
+  'PH': { 'territory': 'Philippines' },
+  'PK': { 'territory': 'Pakistan' },
+  'PL': { 'territory': 'Poland' },
+  'PR': { 'territory': 'Peurto Rico (historical allocations)', 'deallocated': true },
+  'PS': { 'territory': 'Palestine', 'allocated': 2024 }, // December 2024
+  'PT': { 'territory': 'Portugal' },
+  'PY': { 'territory': 'Paraguay' },
+  'QA': { 'territory': 'Qatar' },
+  'QM': { 'territory': 'United States', 'allocated': 2010, 'reserved': ['S1Z'] },
+  'QN': { 'territory': 'Worldwide (direct allocation)', 'allocated': 2024 },
+  'QT': { 'territory': 'United States', 'allocated': 2024, 'reserved': ['S1Z'] },
+  'QZ': { 'territory': 'United States', 'allocated': 2015, 'reserved': ['S1Z'] },
+  'RO': { 'territory': 'Romania' },
+  'RS': { 'territory': 'Serbia' },
+  'RU': { 'territory': 'Russian Federation' },
+  'RW': { 'territory': 'Rwanda', 'allocated': 2024 }, // December 2024
+  'SA': { 'territory': 'Saudi Arabia' },
+  'SB': { 'territory': 'Solomon Islands' },
+  'SC': { 'territory': 'Seychelles' },
+  'SD': { 'territory': 'Sudan', 'allocated': 2024 }, // December 2024
+  'SE': { 'territory': 'Sweden' },
+  'SG': { 'territory': 'Singapore' },
+  'SI': { 'territory': 'Slovenia' },
+  'SK': { 'territory': 'Slovakia' },
+  'SL': { 'territory': 'Sierra Leone' },
+  'SM': { 'territory': 'San Marino' },
+  'SN': { 'territory': 'Senegal' },
+  'SO': { 'territory': 'Somalia', 'allocated': 2024 }, // December 2024
+  'SR': { 'territory': 'Suriname', 'allocated': 2024 }, // December 2024
+  'SS': { 'territory': 'South Sudan', 'allocated': 2024 }, // December 2024
+  'SV': { 'territory': 'El Salvador' },
+  'SX': { 'territory': 'Sint Maarten (Dutch part)' },
+  'SY': { 'territory': 'Syrian Arab Republic', 'allocated': 2024 }, // December 2024
+  'SZ': { 'territory': 'Swaziland' },
+  'TC': { 'territory': 'TuneCore (Turks and Caicos Islands prior to 2013)' },
+  'TD': { 'territory': 'Chad', 'allocated': 2024 }, // December 2024
+  'TG': { 'territory': 'Togo', 'allocated': 2024 }, // December 2024
+  'TH': { 'territory': 'Thailand' },
+  'TL': { 'territory': 'Timor-Leste', 'allocated': 2024 }, // December 2024
+  'TN': { 'territory': 'Tunisia' },
+  'TO': { 'territory': 'Tonga' },
+  'TR': { 'territory': 'Turkey' },
+  'TT': { 'territory': 'Trinidad and Tobago' },
+  'TW': { 'territory': 'Chinese Taipei' },
+  'TZ': { 'territory': 'Tanzania' },
+  'UA': { 'territory': 'Ukraine' },
+  'UG': { 'territory': 'Uganda' },
+  'UK': { 'territory': 'United Kingdom', 'allocated': 2012 },
+  'US': { 'territory': 'United States' },
+  'UY': { 'territory': 'Uruguay' },
+  'UZ': { 'territory': 'Uzbekistan' },
+  'VC': { 'territory': 'Saint Vincent and the Grenadines' },
+  'VE': { 'territory': 'Venezuela' },
+  'VG': { 'territory': 'British Virgin Islands' },
+  'VN': { 'territory': 'Viet Nam' },
+  'VU': { 'territory': 'Vanuatu' },
+  'VV': { 'territory': 'Worldwide (automated assignment of ISRC)', 'allocated': 2025 }, // October 2025
+  'XK': { 'territory': 'Kosovo' },
+  'YE': { 'territory': 'Yemen', 'allocated': 2024 }, // December 2024
+  'YU': { 'territory': 'Allocated to producers in former Yugoslavia', 'deallocated': 2003 },
+  'ZA': { 'territory': 'South Africa' },
+  'ZB': { 'territory': 'South Africa' },
+  'ZM': { 'territory': 'Zambia' },
+  'ZW': { 'territory': 'Zimbabwe' },
+  'ZZ': { 'territory': 'Worldwide (direct allocation)', 'allocated': 2007 },
+};
 
 function checkOneISRC(isrc, medium, track, isrcHistory) {
   let checks = [];
@@ -403,15 +588,43 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
   const [, country, registrant, year, designation] = match;
 
   let invalid = false;
-  if ((country == 'US' && registrant == 'S1Z') ||
-      (country == 'JM' && registrant == 'K40') ||
-      (country == 'NZ' && registrant == 'AA0')) {
-    checks.push({type: "danger", message: `${country} registration code “${registrant}” is reserved for documentation`});
-    invalid = true;
-  }
-  if (ccodes.indexOf(country) === -1) {
+  const current_year = new Date().getFullYear();
+  const current_nodecade = current_year % 100;
+  const code_info = ccodes[country];
+  if (code_info) {
+    const allocated = code_info['allocated'];
+    if (allocated && current_year < (allocated + 99)) {
+      const allocated_nodecade = allocated % 100;
+      if (
+          (current_nodecade >= allocated_nodecade && (year < allocated_nodecade || year > current_nodecade))
+          || (current_nodecade < allocated_nodecade && (year > current_nodecade && year < allocated_nodecade))
+      ) {
+        checks.push({type: "warning", message: `The year field in this ISRC is ${year}, but the IFPI territory code ${country} (${code_info['territory']}) was allocated in ${allocated}`});
+      }
+    }
+
+    const deallocated = code_info['deallocated'];
+    if (deallocated === true) {
+      checks.push({type: "info", message: `The IFPI territory code ${country} (${code_info['territory']}) is no longer allocated`});
+    } else if (deallocated && (deallocated - 1986) < 99) {
+      const deallocated_nodecade = deallocated % 100;
+      if (
+          (deallocated_nodecade >= 86 && (year < 86 || year > deallocated_nodecade))
+          || (deallocated_nodecade < 86 && (year > deallocated_nodecade && year < 86))
+      ) {
+        checks.push({type: "warning", message: `The year field in this ISRC is ${year}, but the IFPI territory code ${country} (${code_info['territory']}) was deallocated in ${deallocated}`});
+      }
+    }
+
+    const reserved_registrant = code_info['reserved'];
+    if (reserved_registrant && reserved_registrant.indexOf(registrant) != -1) {
+      checks.push({type: "danger", message: `ISRCs starting with ${country}${registrant} are reserved for documentation`});
+      invalid = true;
+    }
+  } else {
     checks.push({type: "danger", message: `${country} is not allocated by the IFPI (last updated ${ccodesUpdated})`});
   }
+
   if (registrant == '000') {
     checks.push({type: "warning", message: `Registrant code “${registrant}” may indicate blank or dummy data`});
   }
@@ -425,22 +638,6 @@ function checkOneISRC(isrc, medium, track, isrcHistory) {
     checks.push({type: "warning", message: `This ISRC is repeated from ${isrcHistory[isrc].medium} track ${isrcHistory[isrc].track}`});
   }
   isrcHistory[isrc] = {medium: `${medium.format ?? "Medium"} ${medium.position}`, track: track.number};
-
-  if (country == 'CS' && (year > 6 && year < 86)) {
-    checks.info({type: "info", message: "Allocated to producers in former Serbia & Montenegro (prior to 2006)"});
-  }
-  if (country == 'IM') {
-    checks.push({type: 'info', message: 'Historically allocated for Isle of Mann. Registrants in Isle of Mann now supported by PPL UK.'});
-  }
-  if (country == 'PR') {
-    checks.push({type: "info", message: "Historically allocated for Puerto Rico. Registrants in Peurto Rico now supported by RIAA (United States)."});
-  }
-  if (country == 'TC') {
-    checks.push({type: "info", message: "TC is allocated to TuneCore - Turks and Caicos Islands use DG"});
-  }
-  if (country == 'YU' && (year > 3 && year < 86)) {
-    checks.push({type: "info", message: "Allocated to producers in former Yugoslavia (prior to 2003)"});
-  }
 
   return {
     isrc: isrc,
