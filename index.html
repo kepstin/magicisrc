@@ -668,7 +668,7 @@ function doLogin() {
     params.set("client_id", mb_oauth_client_id);
     params.set("redirect_uri", mb_oauth_redirect_uri);
     params.set("scope", "profile submit_isrc");
-    params.set("approval_prompt", "force");
+    params.set("approval_prompt", "auto");
     params.set("state", stateId);
     params.set("code_challenge", codeChallenge);
     params.set("code_challenge_method", "S256");
